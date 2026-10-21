@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>在线问卷系统</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>在线问卷系统</h1>
+    <p>
+      基于 Node.js、Express 和 MongoDB
+    </p>
+  </header>
+
+  <main class="page-container">
+    <section class="card">
+      <h2>系统状态</h2>
+      <p id="api-status">
+        正在检查后端服务……
+      </p>
+    </section>
+
+    <section
+      id="guest-panel"
+      class="card auth-card"
+    >
+      <div
+        class="auth-tabs"
+        role="tablist"
+        aria-label="账号操作"
+      >
+        <button
+          id="login-tab"
+          class="auth-tab is-active"
+          type="button"
+          role="tab"
+          aria-selected="true"
+        >
+          登录
+        </button>
+
+        <button
+          id="register-tab"
+          class="auth-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+        >
+          注册
+        </button>
+      </div>
+
+      <form id="login-form">
+        <h2>登录账号</h2>
+
+        <label for="login-username">
+          用户名
+        </label>
+        <input
+          id="login-username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          required
+        >
+
+        <label for="login-password">
+          密码
+        </label>
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit">
+          登录
+        </button>
+      </form>
+
+      <form id="register-form" hidden>
+        <h2>注册账号</h2>
+
+        <label for="register-username">
+          用户名
+        </label>
+        <input
+          id="register-username"
+          name="username"
+          type="text"
+          minlength="3"
+          maxlength="30"
+          autocomplete="username"
+          required
+        >
+
+        <label for="register-password">
+          密码
+        </label>
+        <input
+          id="register-password"
+          name="password"
+          type="password"
+          minlength="8"
+          autocomplete="new-password"
+          required
+        >
+
+        <button type="submit">
+          注册并登录
+        </button>
+      </form>
+    </section>
+
+    <section
+      id="user-panel"
+      class="card"
+      hidden
+    >
+      <h2>当前用户</h2>
+
+      <p>
+        已登录：
+        <strong id="current-username"></strong>
+      </p>
+
+      <button
+        id="logout-button"
+        type="button"
+        class="button-secondary"
+      >
+        退出登录
+      </button>
+    </section>
+
+    <p
+      id="auth-message"
+      class="form-message"
+      role="status"
+    ></p>
+
+    <section
+      id="survey-management"
+      hidden
+    >
+      <div class="survey-layout">
+        <form
+          id="create-survey-form"
+          class="card"
+        >
+          <h2>创建问卷</h2>
+
+          <label for="survey-title">
+            问卷标题
+          </label>
+          <input
+            id="survey-title"
+            name="title"
+            type="text"
+            maxlength="100"
+            required
+          >
+
+          <label for="survey-description">
+            问卷说明
+          </label>
+          <textarea
+            id="survey-description"
+            name="description"
+            rows="5"
+            maxlength="1000"
+          ></textarea>
+
+          <label for="survey-deadline">
+            截止时间
+          </label>
+          <input
+            id="survey-deadline"
+            name="deadline"
+            type="datetime-local"
+          >
+
+          <label class="checkbox-row">
+            <input
+              id="survey-anonymous"
+              name="allowAnonymous"
+              type="checkbox"
+            >
+            <span>允许匿名填写</span>
+          </label>
+
+          <label class="checkbox-row">
+            <input
+              id="survey-multiple"
+              name="allowMultipleSubmissions"
+              type="checkbox"
+            >
+            <span>
+              允许同一用户多次提交
+            </span>
+          </label>
+
+          <button type="submit">
+            创建问卷
+          </button>
+
+          <p
+            id="create-survey-message"
+            class="form-message"
+            role="status"
+          ></p>
+        </form>
+
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>我的问卷</h2>
+              <p id="survey-summary">
+                正在读取……
+              </p>
+            </div>
+
+            <div class="list-controls">
+              <label for="survey-status-filter">
+                状态
+              </label>
+
+              <select id="survey-status-filter">
+                <option value="">
+                  全部
+                </option>
+                <option value="draft">
+                  草稿
+                </option>
+                <option value="published">
+                  已发布
+                </option>
+                <option value="closed">
+                  已关闭
+                </option>
+              </select>
+
+              <button
+                id="refresh-surveys-button"
+                class="button-secondary compact-button"
+                type="button"
+              >
+                刷新
+              </button>
+            </div>
+          </div>
+
+          <p
+            id="survey-list-message"
+            class="form-message"
+            role="status"
+          ></p>
+
+          <div id="survey-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section
+      id="question-management"
+      hidden
+    >
+      <section class="card section-heading">
+        <div>
+          <h2>题目管理</h2>
+          <p id="selected-survey-name"></p>
+        </div>
+
+        <button
+          id="back-to-surveys-button"
+          class="button-secondary compact-button"
+          type="button"
+        >
+          返回问卷列表
+        </button>
+      </section>
+
+      <div class="question-layout">
+        <form
+          id="create-question-form"
+          class="card"
+        >
+          <h2 id="question-form-title">
+            添加题目
+          </h2>
+
+          <label for="question-type">
+            题型
+          </label>
+          <select
+            id="question-type"
+            name="type"
+          >
+            <option value="singleChoice">
+              单选题
+            </option>
+            <option value="multipleChoice">
+              多选题
+            </option>
+            <option value="text">
+              文本题
+            </option>
+            <option value="number">
+              数字题
+            </option>
+          </select>
+
+          <label for="question-title">
+            题目内容
+          </label>
+          <textarea
+            id="question-title"
+            name="title"
+            rows="3"
+            maxlength="500"
+            required
+          ></textarea>
+
+          <label class="checkbox-row">
+            <input
+              id="question-required"
+              name="required"
+              type="checkbox"
+            >
+            <span>设为必答题</span>
+          </label>
+
+          <div id="choice-question-config">
+            <label for="question-options">
+              选项
+            </label>
+            <textarea
+              id="question-options"
+              rows="5"
+              placeholder="每行输入一个选项，至少两项"
+            ></textarea>
+          </div>
+
+          <div
+            id="multiple-choice-validation"
+            hidden
+          >
+            <label for="minimum-selections">
+              最少选择数量
+            </label>
+            <input
+              id="minimum-selections"
+              type="number"
+              min="0"
+              step="1"
+            >
+
+            <label for="maximum-selections">
+              最多选择数量
+            </label>
+            <input
+              id="maximum-selections"
+              type="number"
+              min="0"
+              step="1"
+            >
+          </div>
+
+          <div
+            id="text-validation"
+            hidden
+          >
+            <label for="minimum-length">
+              最少字符数
+            </label>
+            <input
+              id="minimum-length"
+              type="number"
+              min="0"
+              step="1"
+            >
+
+            <label for="maximum-length">
+              最多字符数
+            </label>
+            <input
+              id="maximum-length"
+              type="number"
+              min="0"
+              step="1"
+            >
+          </div>
+
+          <div
+            id="number-validation"
+            hidden
+          >
+            <label for="minimum-value">
+              最小值
+            </label>
+            <input
+              id="minimum-value"
+              type="number"
+              step="any"
+            >
+
+            <label for="maximum-value">
+              最大值
+            </label>
+            <input
+              id="maximum-value"
+              type="number"
+              step="any"
+            >
+
+            <label class="checkbox-row">
+              <input
+                id="integer-only"
+                type="checkbox"
+              >
+              <span>必须为整数</span>
+            </label>
+          </div>
+
+          <div class="question-form-actions">
+            <button
+              id="question-submit-button"
+              type="submit"
+            >
+              添加题目
+            </button>
+
+            <button
+              id="cancel-question-edit-button"
+              class="button-secondary"
+              type="button"
+              hidden
+            >
+              取消编辑
+            </button>
+          </div>
+
+          <p
+            id="create-question-message"
+            class="form-message"
+            role="status"
+          ></p>
+        </form>
+
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>题目列表</h2>
+              <p id="question-summary"></p>
+            </div>
+
+            <button
+              id="refresh-questions-button"
+              class="button-secondary compact-button"
+              type="button"
+            >
+              刷新
+            </button>
+          </div>
+
+          <p
+            id="question-list-message"
+            class="form-message"
+            role="status"
+          ></p>
+
+          <div id="question-list"></div>
+        </section>
+      </div>
+
+      <section
+        id="jump-rule-editor"
+        class="card"
+        hidden
+      >
+        <div class="section-heading">
+          <div>
+            <h2>跳转规则</h2>
+            <p id="jump-rule-question-name"></p>
+          </div>
+
+          <button
+            id="close-jump-rule-editor"
+            class="button-secondary compact-button"
+            type="button"
+          >
+            关闭
+          </button>
+        </div>
+
+        <form id="jump-rule-draft-form">
+          <div class="jump-rule-grid">
+            <div>
+              <label for="jump-rule-operator">
+                判断条件
+              </label>
+              <select
+                id="jump-rule-operator"
+              ></select>
+            </div>
+
+            <div>
+              <label>比较值</label>
+              <div
+                id="jump-rule-value-container"
+              ></div>
+            </div>
+
+            <div>
+              <label for="jump-rule-action">
+                命中后操作
+              </label>
+              <select id="jump-rule-action">
+                <option value="goto">
+                  跳转到后续题目
+                </option>
+                <option value="submit">
+                  直接提交问卷
+                </option>
+              </select>
+            </div>
+
+            <div
+              id="jump-rule-target-group"
+            >
+              <label for="jump-rule-target">
+                目标题目
+              </label>
+              <select
+                id="jump-rule-target"
+              ></select>
+            </div>
+
+            <div>
+              <label for="jump-rule-priority">
+                优先级
+              </label>
+              <input
+                id="jump-rule-priority"
+                type="number"
+                min="0"
+                step="1"
+                required
+              >
+            </div>
+          </div>
+
+          <button type="submit">
+            加入规则列表
+          </button>
+        </form>
+
+        <p
+          id="jump-rule-message"
+          class="form-message"
+          role="status"
+        ></p>
+
+        <div id="jump-rule-list"></div>
+
+        <button
+          id="save-jump-rules-button"
+          type="button"
+        >
+          保存全部规则
+        </button>
+      </section>
+    </section>
+  </main>
+
+  <script src="/js/api.js" defer></script>
+  <script src="/js/jumpRules.js" defer></script>
+  <script src="/js/questions.js" defer></script>
+  <script src="/js/surveys.js" defer></script>
+  <script src="/js/app.js" defer></script>
+</body>
+</html>

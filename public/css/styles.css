@@ -1,0 +1,451 @@
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  color: #1f2937;
+  background: #f3f4f6;
+  font-family:
+    "Microsoft YaHei",
+    Arial,
+    sans-serif;
+}
+
+.site-header {
+  padding: 32px 20px;
+  color: white;
+  text-align: center;
+  background: #2563eb;
+}
+
+.site-header h1 {
+  margin: 0 0 8px;
+}
+
+.site-header p {
+  margin: 0;
+}
+
+.page-container {
+  width: min(900px, calc(100% - 32px));
+  margin: 32px auto;
+}
+
+.card {
+  margin-bottom: 20px;
+  padding: 24px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
+}
+
+.status-success {
+  color: #15803d;
+}
+
+.status-error {
+  color: #b91c1c;
+}
+
+.auth-card {
+  max-width: 520px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.auth-tab {
+  margin: 0;
+  color: #334155;
+  background: #e2e8f0;
+}
+
+.auth-tab:hover {
+  background: #cbd5e1;
+}
+
+.auth-tab.is-active {
+  color: white;
+  background: #2563eb;
+}
+
+label {
+  display: block;
+  margin: 16px 0 6px;
+  font-weight: 600;
+}
+
+input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+}
+
+input:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgb(37 99 235 / 20%);
+}
+
+textarea,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+textarea:focus,
+select:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgb(37 99 235 / 20%);
+}
+
+button {
+  margin-top: 20px;
+  padding: 10px 18px;
+  color: white;
+  background: #2563eb;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button-secondary {
+  background: #475569;
+}
+
+.button-secondary:hover {
+  background: #334155;
+}
+
+.button-danger {
+  background: #dc2626;
+}
+
+.button-danger:hover {
+  background: #b91c1c;
+}
+
+.form-message {
+  min-height: 24px;
+  font-weight: 600;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
+.survey-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 360px)
+    minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.section-heading {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-heading h2,
+.section-heading p {
+  margin-top: 0;
+}
+
+.list-controls {
+  min-width: 140px;
+}
+
+.list-controls label {
+  margin-top: 0;
+}
+
+.compact-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.survey-item {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.survey-item h3 {
+  margin: 0 0 8px;
+}
+
+.survey-description {
+  color: #475569;
+}
+
+.survey-detail {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.survey-status {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #1e3a8a;
+  background: #dbeafe;
+  font-size: 14px;
+}
+
+.survey-actions {
+  margin-top: 14px;
+}
+
+.manage-questions-button {
+  margin-top: 0;
+}
+
+.empty-message {
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.question-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 380px)
+    minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.question-item {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.question-item h3 {
+  margin: 0 0 8px;
+}
+
+.question-meta {
+  margin: 6px 0;
+  color: #475569;
+}
+
+.question-options {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.question-actions,
+.question-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.question-actions button,
+.question-form-actions button {
+  margin-top: 0;
+}
+
+@media (max-width: 760px) {
+  .survey-layout,
+  .question-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading {
+    display: block;
+  }
+
+  .list-controls {
+    margin-top: 20px;
+  }
+}
+.jump-rule-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 0 20px;
+}
+
+.jump-rule-item {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.jump-rule-item p {
+  margin: 6px 0;
+}
+
+.jump-rule-item button {
+  margin-top: 8px;
+}
+
+.rule-choice-list {
+  padding: 8px 0;
+}
+
+@media (max-width: 640px) {
+  .jump-rule-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.survey-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.survey-actions button {
+  margin-top: 0;
+}
+
+.survey-status-draft {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.survey-status-published {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.survey-status-closed {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.public-survey-container {
+  max-width: 760px;
+}
+
+.public-question h3 {
+  margin-top: 0;
+}
+.public-progress {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.public-progress p {
+  margin: 4px 0;
+}
+
+.public-answer-control {
+  margin-top: 18px;
+}
+
+.public-choice {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.public-choice:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.public-choice input {
+  flex: 0 0 auto;
+}
+
+.public-navigation {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.public-navigation button {
+  margin-top: 0;
+}
+
+.anonymous-panel {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.anonymous-panel label {
+  margin-top: 0;
+}
+
+.anonymous-panel p {
+  margin-bottom: 0;
+}
+
+.submission-success {
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+}
+
+.submission-success h2 {
+  color: #166534;
+}
+
+@media (max-width: 520px) {
+  .public-navigation {
+    flex-direction: column-reverse;
+  }
+
+  .public-navigation button {
+    width: 100%;
+  }
+}

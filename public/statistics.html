@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>问卷统计</title>
+
+  <link
+    rel="stylesheet"
+    href="/css/styles.css"
+  >
+  <link
+    rel="stylesheet"
+    href="/css/statistics.css"
+  >
+</head>
+<body>
+  <header class="site-header">
+    <h1>问卷统计</h1>
+    <p>查看答卷数量和各题汇总结果</p>
+  </header>
+
+  <main
+    class="page-container statistics-container"
+  >
+    <p>
+      <a href="/">
+        返回问卷管理
+      </a>
+    </p>
+
+    <section class="card">
+      <h2 id="statistics-survey-title">
+        正在加载统计……
+      </h2>
+
+      <p id="statistics-auth-status"></p>
+
+      <p
+        id="statistics-message"
+        class="form-message"
+        role="status"
+        aria-live="polite"
+      ></p>
+    </section>
+
+    <section
+      id="statistics-content"
+      hidden
+    >
+      <section class="card">
+        <div class="statistics-overview">
+          <div class="statistics-metric">
+            <span class="statistics-metric-label">
+              问卷状态
+            </span>
+            <strong
+              id="statistics-survey-status"
+            ></strong>
+          </div>
+
+          <div class="statistics-metric">
+            <span class="statistics-metric-label">
+              总答卷数
+            </span>
+            <strong
+              id="statistics-response-count"
+            ></strong>
+          </div>
+
+          <div class="statistics-metric">
+            <span class="statistics-metric-label">
+              当前题目数
+            </span>
+            <strong
+              id="statistics-question-count"
+            ></strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card statistics-controls">
+        <div>
+          <label for="statistics-question-filter">
+            题目筛选
+          </label>
+
+          <select id="statistics-question-filter">
+            <option value="">
+              整份问卷
+            </option>
+          </select>
+        </div>
+
+        <button
+          id="refresh-statistics-button"
+          type="button"
+          class="button-secondary"
+        >
+          刷新统计
+        </button>
+      </section>
+
+      <section
+        id="statistics-question-list"
+      ></section>
+    </section>
+  </main>
+
+  <script src="/js/api.js" defer></script>
+  <script
+    src="/js/statistics.js"
+    defer
+  ></script>
+</body>
+</html>

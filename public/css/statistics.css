@@ -1,0 +1,132 @@
+.statistics-container {
+  max-width: 960px;
+}
+
+.statistics-overview {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.statistics-metric {
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.statistics-metric-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.statistics-metric strong {
+  color: #1e3a8a;
+  font-size: 24px;
+}
+
+.statistics-controls {
+  display: flex;
+  gap: 20px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.statistics-controls > div {
+  flex: 1;
+}
+
+.statistics-controls label {
+  margin-top: 0;
+}
+
+.statistics-controls button {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.statistics-question h3 {
+  margin-top: 0;
+}
+
+.statistics-answer-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.statistics-table-wrapper {
+  overflow-x: auto;
+}
+
+.statistics-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statistics-table th,
+.statistics-table td {
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  text-align: left;
+}
+
+.statistics-table th {
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.statistics-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.statistics-text-values {
+  margin: 18px 0 0;
+  padding-left: 28px;
+}
+
+.statistics-text-values li {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-left: 4px solid #93c5fd;
+  background: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.statistics-number-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+@media (max-width: 760px) {
+  .statistics-overview,
+  .statistics-number-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .statistics-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .statistics-controls button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .statistics-overview,
+  .statistics-answer-summary,
+  .statistics-number-grid {
+    grid-template-columns: 1fr;
+  }
+}

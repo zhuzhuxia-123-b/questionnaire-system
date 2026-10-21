@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>填写问卷</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>在线问卷</h1>
+    <p>请按实际情况填写</p>
+  </header>
+
+  <main
+    class="page-container public-survey-container"
+  >
+    <p>
+      <a href="/">返回系统首页</a>
+    </p>
+
+    <section class="card">
+      <h2 id="public-survey-title">
+        正在加载问卷……
+      </h2>
+
+      <p id="public-survey-description"></p>
+      <p id="public-survey-deadline"></p>
+
+      <p
+        id="public-auth-status"
+        class="question-meta"
+      ></p>
+
+      <p
+        id="public-survey-message"
+        class="form-message"
+        role="status"
+        aria-live="polite"
+      ></p>
+    </section>
+
+    <section
+      id="public-question-list"
+      class="card"
+      hidden
+    >
+      <div class="public-progress">
+        <p id="question-progress"></p>
+        <p class="question-meta">
+          问卷可能根据答案跳过部分题目。
+        </p>
+      </div>
+
+      <form
+        id="response-form"
+        novalidate
+      >
+        <div id="current-question"></div>
+
+        <p
+          id="question-message"
+          class="form-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+
+        <div
+          id="anonymous-panel"
+          class="anonymous-panel"
+          hidden
+        >
+          <label class="checkbox-row">
+            <input
+              id="anonymous-checkbox"
+              type="checkbox"
+            >
+            匿名提交
+          </label>
+
+          <p class="question-meta">
+            匿名答卷不会向问卷创建者显示填写者身份。
+          </p>
+        </div>
+
+        <div class="public-navigation">
+          <button
+            id="previous-question-button"
+            type="button"
+            class="button-secondary"
+          >
+            上一题
+          </button>
+
+          <button
+            id="next-question-button"
+            type="submit"
+          >
+            下一题
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section
+      id="submission-success"
+      class="card submission-success"
+      hidden
+    >
+      <h2>提交成功</h2>
+
+      <p id="submission-success-message">
+        感谢你的填写。
+      </p>
+
+      <p id="submission-summary"></p>
+
+      <p>
+        <a href="/">返回系统首页</a>
+      </p>
+    </section>
+  </main>
+
+  <script src="/js/api.js" defer></script>
+  <script
+    src="/js/publicSurvey.js"
+    defer
+  ></script>
+</body>
+</html>
