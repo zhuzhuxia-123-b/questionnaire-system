@@ -1260,3 +1260,61 @@ AI 根据需求变更中的八项用户反馈，提供了 `docs/第二阶段需�
 - 文件最后一项为“项目能够在干净环境中安装、迁移、运行和测试”。
 - 文档已覆盖两份作业文档中与第二阶段有关的功能、兼容、测试、提交和报告要求。
 - 本步骤只建立和检查需求文档，没有修改第一阶段业务代码。
+
+## AI-022 第二阶段 MongoDB 数据结构与迁移方案设计
+
+**日期：** 2026-10-26
+**使用工具：** Codex、Windows PowerShell、JavaScript、Mongoose、MongoDB、Markdown
+**状态：** 已完成
+
+### Prompt
+
+```text
+初始 Prompt：
+请开始第二阶段第2步。读取现有 User、Survey、Question、Response 模型、数据库设计和第二阶段需求基线，分析需要新增或调整的集合、字段、引用、索引与旧数据迁移方案。先完成设计，不修改业务代码；文档由我亲自修改，AI 使用日志由你从 AI-022 继续记录。
+
+完成验证 Prompt：
+我已经把第二阶段数据库设计追加到 docs/数据库设计.md。文档保留原第 1 至 12 节，新增第 13 至 31 节；questionItems、questionVersions、questionShares、questionBanks、questions 和 responses 调整、旧数据迁移、迁移验证及回滚兼容内容均存在。设计正确，请更新 AI-022，并继续教我建立新模型前的数据库备份与旧数据基线检查。
+```
+
+### Result 得到什么代码或结果
+
+AI 读取第一阶段实际的 `User.js`、`Survey.js`、`Question.js`、`Response.js`、模型出口文件、数据库设计和第二阶段需求基线，确认第一阶段的 `questions` 同时保存问卷归属、顺序、题目内容、必答设置、校验和跳转规则，并被答卷答案、填写路径和跳转目标引用，因此不能删除或重新生成原题目记录。
+
+AI 提供了第二阶段增量数据库设计：保留原 `users`、`surveys`、`questions` 和 `responses`；新增 `questionItems` 保存逻辑题目、`questionVersions` 保存不可变版本、`questionShares` 保存共享关系、`questionBanks` 保存嵌入式题库条目，并建议使用 `schemaMigrations` 记录迁移过程。现有 `questions` 继续作为问卷题目实例，增加逻辑题目和版本引用；`responses.answers` 增加相同引用用于跨问卷统计，同时保留原 questionId、填写路径和题目选项快照。
+
+### 是否修改
+
+未修改设计内容。学生按照 AI 提供的设计亲自将第 13 至 31 节追加到 `docs/数据库设计.md`。AI 没有修改模型、控制器、路由、数据库或其他业务代码，只读取实际文件、提出设计方案并检查学生完成的文档。
+
+### 修改内容
+
+- 在原数据库设计后增加第二阶段调整目标和新集合关系，不覆盖第一阶段设计记录。
+- 设计 `questionItems`，保存题目所有者、当前推荐版本、最新版本号、归档状态和旧题目标识。
+- 设计 `questionVersions`，保存不可变题目内容、版本号、直接父版本和恢复来源版本。
+- 设计 `questionShares`，通过独立集合记录使用权限、有效状态、共享与取消时间。
+- 设计 `questionBanks`，使用嵌入数组保存逻辑题目、推荐版本、顺序和加入时间。
+- 保留 `questions._id`、surveyId、order、required 和 jumpRules，并增加 questionItemId、questionVersionId、contentSource 和 schemaVersion。
+- 明确跳转规则继续引用同一问卷内的 Question 实例，不直接引用公共版本。
+- 为 `responses.answers` 增加 questionItemId 和 questionVersionId，并继续保留题目、题型和选项快照。
+- 设计逻辑题目、版本、共享、题库、问卷使用情况和答卷统计所需索引。
+- 不建立独立的题目使用情况和统计结果集合，分别从 questions 与 responses 聚合，避免重复数据失去同步。
+- 设计版本号原子分配、唯一索引、历史版本不可变、恢复时创建新版本及归档策略。
+- 设计第一阶段旧题目到逻辑题目和 v1 的迁移、答卷答案引用补充、问卷版本更新、迁移记录、幂等检查和迁移后验证。
+- 明确迁移采用新增字段与集合的方式，不删除第一阶段兼容字段，并保留回滚能力。
+
+### 验证结果
+
+- `docs/数据库设计.md` 原第 1 至 12 节仍然存在，新增第 13 至 31 节，共 19 个新增二级章节。
+- 新增章节没有重复标题或空标题。
+- 文档中的 14 个 Markdown 代码围栏开始与结束成对。
+- questionItems、questionVersions、questionShares 和 questionBanks 的用途、字段、引用和索引均有说明。
+- questions 与 responses 的保留字段、新增字段、引用方向和索引均有说明。
+- 题目版本不保存 order、required 和 jumpRules，问卷专属配置与公共题目内容已分离。
+- 原 Question._id、jumpRules.targetQuestionId、answers.questionId 和 visitedQuestionIds 均被保留，避免破坏第一阶段数据。
+- 迁移方案不会根据相同标题自动合并旧题，避免把无关题目错误识别为同一道逻辑题目。
+- legacyQuestionId 唯一稀疏索引、版本唯一组合索引和迁移记录共同支持幂等执行。
+- 题目库采用嵌入条目，并说明了适用规模、重复校验和未来拆分条件。
+- 跨问卷统计基于 responses.answers 中的逻辑题目和版本引用，不依赖标题，也不新建可能失去同步的统计集合。
+- 数据权限、删除归档、迁移后验证和回滚兼容策略完整。
+- 本步骤没有修改业务代码，也没有修改数据库数据或索引。
