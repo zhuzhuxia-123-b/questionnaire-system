@@ -1318,3 +1318,658 @@ AI 提供了第二阶段增量数据库设计：保留原 `users`、`surveys`、
 - 跨问卷统计基于 responses.answers 中的逻辑题目和版本引用，不依赖标题，也不新建可能失去同步的统计集合。
 - 数据权限、删除归档、迁移后验证和回滚兼容策略完整。
 - 本步骤没有修改业务代码，也没有修改数据库数据或索引。
+
+## AI-023 第二阶段修改前数据库备份与旧数据基线
+
+**日期：** 2026-10-26
+**使用工具：** Codex、Windows PowerShell、MongoDB、MongoDB Database Tools、mongosh、mongodump
+**状态：** 已完成
+
+### Prompt
+
+```text
+初始 Prompt：
+请继续教我建立新模型前的数据库备份与旧数据基线检查。
+
+流程改进 Prompt：
+我认为数据库备份流程应该先检查 MongoDB 服务、数据库连接以及 mongodump 和 mongorestore，不能默认工具已经安装；Git 也不需要每一步都推送。AI 日志应按完整功能阶段合并记录。
+
+完成验证 Prompt：
+我已经安装 MongoDB Database Tools，确认 mongodump 和 mongorestore 版本为 100.19.1，重新启动 MongoDB 并通过 ping 检查；备份目录包含 users、surveys、questions 和 responses 四个核心 BSON 文件。旧数据数量为 users 6、surveys 7、questions 12、responses 3。请完成 AI-023，然后开始新模型与迁移阶段，不再进行哈希、恢复演练或 Git 提交。
+```
+
+### Result 得到什么代码或结果
+
+AI 最初给出的备份流程直接使用 `mongodump` 和 `mongorestore`，没有先确认 MongoDB Database Tools 是否安装，也没有先检查 MongoDB Windows 服务状态。实际执行时发现两个工具均不可用，MongoDB 服务为 Stopped，数据库连接返回 `ECONNREFUSED 127.0.0.1:27017`。
+
+学生根据实际问题提出改进意见：备份前应依次检查服务、连接和工具，Git 不需要在每个小步骤提交或推送，AI 日志应按完整功能阶段合并。AI 接受该意见并简化流程，指导学生安装 MongoDB Database Tools、重新启动 MongoDB、执行连接检查、创建阶段一修改前备份，并只保留作业需要的旧数据数量基线检查。
+
+最终在 `D:\python\dataset\questionnaire-backups\stage1-before-stage2-20261026-104856` 创建了 `questionnaire_system` 数据库备份。备份包含四个核心集合的 BSON 数据文件和对应元数据文件，随后通过只读统计得到第一阶段旧数据数量基线。
+
+### 是否修改
+
+已修改开发环境和备份流程，未修改项目业务代码、MongoDB 原数据或第一阶段功能。学生亲自安装 MongoDB Database Tools、启动 MongoDB 服务、执行备份和数量检查，并提出简化流程与合并日志的改进意见。AI 没有生成或修改业务代码。
+
+### 修改内容
+
+- 安装 MongoDB Database Tools 100.19.1，获得 `mongodump.exe` 和 `mongorestore.exe`。
+- 将 MongoDB Windows 服务从 Stopped 恢复为 Running。
+- 使用 `mongosh` 执行 `db.runCommand({ ping: 1 })`，得到 `{ ok: 1 }`。
+- 在项目目录之外创建带时间戳的第一阶段数据库备份，避免备份文件进入项目提交范围。
+- 备份 `users`、`surveys`、`questions` 和 `responses` 四个第一阶段核心集合及其元数据。
+- 使用只读 `countDocuments` 记录第二阶段修改前的旧数据数量。
+- 根据学生意见取消本阶段不必要的哈希、恢复演练和逐步 Git 操作，后续按完整功能阶段更新 AI 日志。
+
+### 验证结果
+
+- `mongodump` 和 `mongorestore` 版本均为 100.19.1，可以正常执行。
+- MongoDB 服务状态为 Running，数据库 ping 结果为 `{ ok: 1 }`。
+- 备份目录存在，`questionnaire_system` 子目录可以正常读取。
+- `users.bson`、`surveys.bson`、`questions.bson` 和 `responses.bson` 均存在且文件大小大于 0。
+- 四个集合对应的 `.metadata.json` 文件均存在，备份结构完整。
+- 修改前旧数据基线为：users 6 条、surveys 7 条、questions 12 条、responses 3 条。
+- 本阶段没有修改、删除或迁移数据库原记录，也没有修改业务文件。
+- 备份阶段已经结束，可以进入第二阶段新模型和旧数据迁移实现。
+
+## AI-024 第二阶段题目版本模型与旧数据迁移
+
+**日期：** 2026-10-26
+**使用工具：** Codex、Windows PowerShell、Node.js、Mongoose、MongoDB、mongosh、Jest、Supertest
+**状态：** 已完成
+
+### Prompt
+
+```text
+模型设计 Prompt：
+我认为迁移脚本直接运行就修改数据库风险较高。迁移脚本应默认使用 dry-run，只读取并显示目标数据库、旧题目数、旧答卷数和预计修改数量；只有明确传入 --apply 时才执行迁移。脚本应拒绝空数据库名、显示实际数据库名称，并且能够重复运行，第二次执行不能产生重复的 questionItems 或 questionVersions。请先教我创建新增模型并扩展现有模型，模型和迁移全部验证后再统一记录 AI-024。
+
+模型问题修正 Prompt：
+我已经把 SchemaMigration.js 的 errors 改为 errorDetails，并同步修改数据库设计第 27.6 节。本次对 AI 模型代码的实际修改是：发现 AI 使用了 Mongoose 保留路径 errors，我将其改为 errorDetails，避免模型加载警告；其他模型代码未修改。
+
+迁移实现 Prompt：
+请给我完整的默认 dry-run、显式 --apply、显示目标数据库且可重复执行的迁移脚本。重点检查迁移前引用、旧字段保留、幂等 upsert、迁移记录和错误处理。先运行 dry-run，确认没有写入后再执行 --apply。
+
+迁移兼容修正 Prompt：
+我已经把迁移脚本中的两处 new: true 改为 returnDocument: 'after'，语法检查通过。请检查第一次迁移、第二次迁移的幂等性和第一阶段回归测试，完成验证后更新 AI-024。
+```
+
+### Result 得到什么代码或结果
+
+AI 根据第二阶段数据库设计提供了 `QuestionItem.js`、`QuestionVersion.js`、`QuestionShare.js`、`QuestionBank.js` 和 `SchemaMigration.js` 五个新增 Mongoose 模型，并提供了对 `Question.js`、`Response.js` 和 `models/index.js` 的兼容扩展。新增结构用于区分逻辑题目、不可变内容版本、共享关系、题库条目和迁移记录；第一阶段的问卷题目实例、答卷快照和原有引用继续保留。
+
+AI 还提供了 `scripts/migrate-stage2-question-versioning.js`。脚本默认执行 dry-run，只有显式使用 `--apply` 才写入数据库；运行时显示目标数据库，拒绝空数据库名和系统数据库，迁移前检查问卷、题目、跳转目标、答卷答案与填写路径引用，并通过 `legacyQuestionId` 和版本唯一索引进行幂等 upsert。迁移过程保留原题目和答卷字段，补充逻辑题目、版本引用和 schemaVersion，并使用 `schemaMigrations` 记录状态、数量和错误详情。
+
+第一次 dry-run 检查到 users 6 条、surveys 7 条、questions 12 条、responses 3 条，预计迁移题目 12 条、答卷 3 条、问卷 7 条，引用问题为 0；运行前后 questionItems、questionVersions 和 schemaMigrations 均为 0，确认 dry-run 没有写入。第一次正式迁移处理 22 个对象并成功完成，第二次正式迁移处理 0 个、跳过 22 个，证明重复执行不会生成重复数据。
+
+### 是否修改
+
+已修改。学生亲自创建和扩展模型文件及迁移脚本。除两处兼容性修正外，模型和迁移主体采用 AI 提供的代码：学生发现 AI 在 `SchemaMigration` 中使用了 Mongoose 保留路径 `errors`，将其改为 `errorDetails`，并同步修订数据库设计；学生还发现迁移脚本使用了 Mongoose 9 已弃用的 `new: true`，将两处改为 `returnDocument: 'after'`。默认 dry-run、显式 `--apply`、显示并保护目标数据库以及幂等迁移均为学生提出的流程和安全设计意见。
+
+### 修改内容
+
+- 新增 `src/models/QuestionItem.js`，记录逻辑题目、所有者、当前版本、最新版本号、状态和旧题目标识，并为所有者、状态和 `legacyQuestionId` 建立索引。
+- 新增 `src/models/QuestionVersion.js`，保存不可变题型、标题、选项和校验配置，以及版本号、父版本和恢复来源，并建立题目与版本号唯一索引。
+- 新增 `src/models/QuestionShare.js`，记录逻辑题目、共享用户、共享状态和时间，并防止同一题目向同一用户重复建立共享记录。
+- 新增 `src/models/QuestionBank.js`，使用嵌入条目保存题库中的逻辑题目和推荐版本，并校验同一题库不能重复加入同一道题。
+- 新增 `src/models/SchemaMigration.js`，记录迁移模式、状态、计数、完成时间和错误详情；将 AI 最初使用的保留路径 `errors` 改为 `errorDetails`。
+- 扩展 `Question.js`，增加 `questionItemId`、`questionVersionId`、`contentSource` 和 `schemaVersion`，同时保持第一阶段旧题目可以继续加载。
+- 扩展 `Response.js`，为答卷及答案增加版本架构和逻辑题目、版本引用，同时继续保留 questionId、题目与选项快照和 visitedQuestionIds。
+- 更新 `src/models/index.js`，统一导出第一阶段和第二阶段共 9 个模型。
+- 新增 `scripts/migrate-stage2-question-versioning.js`，实现默认 dry-run、显式写入、数据库保护、迁移前引用检查、旧字段保留、幂等迁移、迁移记录和错误处理。
+- 将迁移脚本中的两处 `new: true` 改为 `returnDocument: 'after'`，消除 Mongoose 9 弃用警告。
+- 执行第一次正式迁移，为 12 道旧题分别建立 12 个逻辑题目和 12 个 v1 版本，并升级 12 道问卷题目、3 份答卷和 7 份问卷的第二阶段引用与架构版本。
+
+### 验证结果
+
+- 五个新增模型和三个扩展模型均通过 Node.js 语法检查，`models/index.js` 能够加载 User、Survey、Question、Response、QuestionItem、QuestionVersion、QuestionShare、QuestionBank 和 SchemaMigration 共 9 个模型。
+- 新模型使用明确集合名 `questionItems`、`questionVersions`、`questionShares`、`questionBanks` 和 `schemaMigrations`，集合名称和索引检查均通过。
+- QuestionVersion 的 questionItemId、versionNumber、type、title、options 和 validation 均为不可变字段；题目版本唯一索引和题库重复条目校验生效。
+- 第一阶段 schemaVersion 1 的 Question 和 Response 仍可加载，第二阶段 schemaVersion 2 数据要求具备对应逻辑题目和版本引用。
+- 迁移脚本语法检查通过，默认 dry-run 没有写入数据；目标数据库为 `questionnaire_system`，迁移前引用问题数量为 0。
+- 第一次正式迁移后，旧集合数量保持 users 6、surveys 7、questions 12、responses 3；新增 questionItems 12、questionVersions 12、schemaMigrations 1。
+- 第一次迁移记录状态为 completed，processedCount 为 22、skippedCount 为 0、failedCount 为 0、errorDetails 为空。
+- 第二次执行 `--apply` 后，旧集合和新增集合数量均未变化，processedCount 为 0、skippedCount 为 22、failedCount 为 0、errorDetails 为空，幂等性验证通过。
+- 迁移后缺少题目引用的 Question 数量为 0，缺少版本引用的 Response 数量为 0，未升级 Survey 数量为 0，缺少 currentVersionId 的 QuestionItem 数量为 0。
+- 第一阶段完整 Jest 回归测试结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`，测试服务器和测试数据均已清理。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-025 可复用题目与不可变版本管理
+
+**日期：** 2026-10-26 至 2026-10-28
+**使用工具：** Codex、Windows PowerShell、Node.js、Express、Mongoose、MongoDB、mongosh、Jest、Supertest
+**状态：** 已完成
+
+### Prompt
+
+```text
+设计 Prompt：
+我认为 QuestionVersion 必须保持真正不可变：不提供修改或删除历史版本的接口；编辑可复用题目时创建递增的新版本；恢复历史版本时也应复制历史内容生成一个新版本，而不是把 currentVersionId 直接改回旧版本。已有问卷继续引用原 questionVersionId，不自动升级。请检查这个设计意见，并教我实现可复用题目的创建、本人列表、详情、新版本、历史版本和恢复接口。
+
+代码检查 Prompt：
+我已经创建 questionItemController.js、questionItemRoutes.js，并更新 app.js。当前 AI-025 代码未修改，语法检查和应用模块加载通过。请读取实际代码，检查历史版本不可变、版本递增、并发冲突、恢复生成新版本、问卷字段隔离、所有权和失败清理，并继续教我动态测试。
+
+问题修正 Prompt：
+动态测试登录时，服务器收到的请求体变成了以 123、13、10 等数字组成的字符串并返回服务器内部错误。请根据实际错误定位原因，恢复登录后继续 AI-025 测试。
+
+完成验证 Prompt：
+我已经完成版本创建、历史查询、版本恢复、权限、旧问卷兼容、临时数据清理和 Jest 回归。请更新 AI-025 日志，然后开始下一阶段，不要执行 Git 提交或推送。
+```
+
+### Result 得到什么代码或结果
+
+AI 提供了 `src/controllers/questionItemController.js` 和 `src/routes/questionItemRoutes.js`，并更新 `src/app.js` 挂载 `/api/question-items`。接口支持创建可复用题目及 v1、查询本人题目列表、查看题目详情、创建递增新版本、查询完整版本历史以及从旧版本恢复生成新版本。
+
+版本创建采用“先验证并保存新版本，再以 currentVersionId 和 latestVersionNumber 为条件更新 QuestionItem”的方式处理并发冲突。版本号唯一索引防止相同题目产生重复版本号；条件更新失败时删除未启用的新版本。初始逻辑题目保存失败时也会删除已创建的 v1，避免残留孤立版本。
+
+路由没有提供历史版本的 PATCH 或 DELETE。`surveyId`、`order`、`required` 和 `jumpRules` 被定义为问卷实例专属字段，不能写入公共题目版本。恢复旧版本时复制该版本的题型、标题、选项和校验内容，生成新的递增版本，并分别记录 parentVersionId 和 restoredFromVersionId。
+
+动态测试过程中，AI 最初提供的 PowerShell UTF-8 辅助函数将 `byte[]` 通过函数输出管道展开成 `System.Object[]`，请求体被发送为以空格分隔的数字字符串。测试还发现 Express 已将非法 JSON 标记为 400，但原全局错误处理统一返回了 500。AI 根据实际错误提供修正方案，学生改为直接声明强类型 `byte[]`，并更新 `app.js`，使 `entity.parse.failed` 返回明确的 400 和“请求体必须是有效的 JSON”。
+
+### 是否修改
+
+已修改。学生最初采用 AI 提供的可复用题目控制器、路由和应用挂载代码，随后根据真实动态测试完成两项修正：不再使用会展开数组的 PowerShell UTF-8 辅助函数，改为直接生成强类型 `System.Byte[]`；修改 `app.js` 的全局错误处理中间件，为非法 JSON 单独返回 400。历史版本不可变、恢复时创建新版本和旧问卷不自动升级是学生在编码前提出并采用的设计意见。
+
+### 修改内容
+
+- 新增 `src/controllers/questionItemController.js`，实现可复用题目创建、本人列表、详情、新版本、版本历史和历史恢复。
+- 新增 `src/routes/questionItemRoutes.js`，挂载对应认证接口，但不提供历史版本原地修改或删除路由。
+- 更新 `src/app.js`，挂载 `/api/question-items`，并为 JSON 解析失败增加 400 错误响应。
+- 创建可复用题目时同时创建 QuestionItem 和 v1；任一步骤失败时清理未完成数据。
+- 新版本继承未修改的内容，保留原 optionId，并将版本号递增、父版本指向修改前的当前版本。
+- 恢复旧版本时生成新的版本记录，当前版本向前推进，旧版本内容和 ID 保持不变。
+- 使用 QuestionItem 的 ownerId 进行所有权保护；未登录返回 401，其他用户访问或创建版本返回 404。
+- 禁止将 surveyId、order、required 和 jumpRules 写入公共题目版本，保持题目内容与问卷配置分离。
+- 使用版本唯一索引、条件更新和失败补偿处理并发冲突，不要求本地 MongoDB 配置副本集事务。
+- 将测试请求体改为显式 `[byte[]]` UTF-8 编码，避免 PowerShell 将字节数组展开成数字字符串。
+- 精确清理 AI-025 新建逻辑题目及三个版本、迁移题目的临时新版本和临时第二用户。
+
+### 验证结果
+
+- `questionItemController.js`、`questionItemRoutes.js` 和 `app.js` 均通过 Node.js 语法检查，应用模块加载成功。
+- 问卷专属字段写入公共题目时返回 400；可复用题目成功创建 v1，并能从本人列表和详情接口读取。
+- 创建 v2 后，parentVersionId 指向 v1、原 optionId 保持不变、QuestionItem.currentVersionId 指向 v2。
+- 从 v1 恢复后生成 v3；v3 的父版本为 v2、restoredFromVersionId 为 v1、内容与 v1 一致、当前版本指向 v3。
+- 恢复后历史版本总数为 3，v1 和 v2 的内容均未被修改。
+- 对历史版本执行 PATCH 和 DELETE 均返回 404，非法请求后版本数量不变。
+- 未登录访问返回 401；其他用户查看题目或创建版本均返回 404，所有权保护生效。
+- 对迁移后的逻辑题目创建临时新版本后，QuestionItem.currentVersionId 发生变化，但旧问卷的 questionVersionId 和题目标题均保持原值，旧问卷没有自动升级。
+- 修正 UTF-8 请求体后，请求体类型为 `System.Byte[]`，登录成功获得 Token；非法 JSON 返回 400，不再错误返回 500。
+- 临时数据清理后，正式数据库恢复为 users 6、surveys 7、questions 12、responses 3、questionItems 12、questionVersions 12，AI-025 临时用户数量为 0。
+- 完整 Jest 回归结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-026 指定版本复用与题目使用情况查询
+
+**日期：** 2026-10-28
+**使用工具：** Codex、Windows PowerShell、Node.js、Express、Mongoose、MongoDB、mongosh、Jest、Supertest
+**状态：** 已完成
+
+### Prompt
+
+```text
+设计 Prompt：
+我认为从可复用题目添加到问卷时，应明确保存实际采用的 questionVersionId，不能只保存或动态读取 QuestionItem.currentVersionId。后端应把该版本内容复制到 Question 快照，同时记录 questionItemId、questionVersionId、contentSource='library' 和 schemaVersion=2；required、order 和 jumpRules 继续由问卷实例单独管理。以后逻辑题目的当前版本变化时，已有问卷不能自动升级。
+
+实现 Prompt：
+请读取实际模型、控制器和路由，教我实现将本人可复用题目的指定版本添加到草稿问卷、保存内容快照、查询逻辑题目被本人哪些问卷和版本使用，并阻止未登录、越权、已发布或已关闭问卷复用。业务文件由我亲自修改，完成验证前不要更新日志或执行 Git 操作。
+
+完成验证 Prompt：
+我已经完成显式版本复用、快照、usage、权限和状态保护测试，精确清理临时数据并运行完整回归测试。请完成 AI-026 日志并开始下一阶段，不要执行 Git 提交或推送。
+```
+
+### Result 得到什么代码或结果
+
+AI 提供了 `src/controllers/questionReuseController.js`，实现将本人可复用题目的明确版本复制到本人草稿问卷。请求必须同时包含 questionItemId 和 questionVersionId，后端验证逻辑题目所有权、有效状态、版本归属和问卷状态后，将版本中的题型、标题、选项和校验配置复制为新的 Question 快照，同时保存逻辑题目与版本引用。
+
+AI 提供了 `src/controllers/questionUsageController.js`，查询同一道逻辑题目在本人问卷中的使用情况。结果包含使用次数、问卷数量、各版本使用次数、是否为当前版本，以及每个问卷实例的题目快照、问卷状态、题目顺序和必答设置，不读取 responses，也不返回填写者身份。
+
+AI 更新了 `questionRoutes.js` 和 `questionItemRoutes.js`，分别增加指定版本复用接口和使用情况接口。现有第一阶段题目创建、编辑、删除和跳转接口继续保留。
+
+### 是否修改
+
+未修改 AI 提供的 AI-026 业务代码。学生提出并采用了“复用时明确记录 questionVersionId、复制内容快照、问卷不自动跟随 currentVersionId 更新”的设计意见，并亲自创建两个控制器、更新两个路由文件、执行全部动态测试和临时数据清理。
+
+### 修改内容
+
+- 新增 `src/controllers/questionReuseController.js`，实现 `POST /api/surveys/:surveyId/questions/from-library`。
+- 复用请求只允许 questionItemId、questionVersionId 和 required，禁止覆盖题型、标题、选项、校验、顺序或跳转规则。
+- 验证问卷属于当前用户且状态为 draft，验证逻辑题目属于当前用户且状态为 active，并验证指定版本属于该逻辑题目。
+- 将指定版本的 type、title、options 和 validation 复制到 Question，保存 questionItemId、questionVersionId、contentSource 为 library、schemaVersion 为 2。
+- required 作为问卷实例配置单独保存，order 根据问卷已有题目自动递增，jumpRules 初始化为空数组。
+- 新增 `src/controllers/questionUsageController.js`，实现 `GET /api/question-items/:questionItemId/usage`。
+- usage 只统计当前用户拥有的问卷，返回使用总数、去重问卷数、各版本使用数和分页后的问卷题目实例。
+- 更新 `src/routes/questionRoutes.js`，挂载从可复用题目添加问卷的路由。
+- 更新 `src/routes/questionItemRoutes.js`，挂载逻辑题目使用情况路由。
+- 保留旧问卷和已存在 Question 的 questionVersionId，不根据 QuestionItem.currentVersionId 自动更新。
+- 精确清理两份本人测试问卷、一个越权测试问卷、两个问卷题目快照、一个临时逻辑题目、两个版本和一个临时用户。
+
+### 验证结果
+
+- 两个新增控制器和两个更新后的路由均通过 Node.js 语法检查，应用模块加载成功。
+- 创建逻辑题目 v1 和 v2 后，分别将历史版本 v1 与当前版本 v2 加入两份不同草稿问卷，两个请求均成功。
+- 复用 v1 时 isCurrentVersion 为 false，复用 v2 时 isCurrentVersion 为 true，证明接口使用请求指定的版本而非动态读取当前版本。
+- 两个 Question 快照分别保留 v1 和 v2 的标题、选项及版本引用；required 可分别设置，contentSource 均为 library、schemaVersion 均为 2、jumpRules 均为空。
+- usage 查询得到 usageCount 2、surveyCount 2；v1 和 v2 各使用 1 次，并能正确区分当前版本。
+- usage JSON 不包含 respondentId、答卷者 username 或 uniqueSubmissionKey。
+- 复用请求试图传入 title 覆盖版本内容时返回 400，失败后问卷题目数量不变。
+- 未登录访问复用和 usage 接口均返回 401。
+- 其他用户不能把当前用户题目加入自己的问卷，不能向当前用户问卷添加题目，也不能查看当前用户题目 usage，三项均返回 404。
+- 问卷发布后继续复用返回 409；问卷关闭后继续复用返回 409。
+- 所有失败请求完成后 usageCount 仍为 2、surveyCount 仍为 2；v1 对应 published 问卷，v2 对应 closed 问卷。
+- 临时数据清理后正式数据库恢复为 users 6、surveys 7、questions 12、responses 3、questionItems 12、questionVersions 12，AI-026 临时用户和临时问卷数量均为 0。
+- 完整 Jest 回归结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-027 题目共享、软撤销与接收者复用
+
+**日期：** 2026-10-28
+**使用工具：** Codex、Windows PowerShell、Node.js、Express、Mongoose、MongoDB、mongosh、Jest、Supertest
+**状态：** 已完成
+
+### Prompt
+
+```text
+设计 Prompt：
+我认为撤销题目共享只能阻止接收者以后继续复用，不能删除或修改接收者已经加入问卷的 Question 快照；共享记录应软撤销，再次共享时重新激活原记录，不能创建重复关系。接收者只有 use 权限，可以查看共享题目及版本并添加到自己的草稿问卷，但不能创建版本、恢复历史、归档、撤销共享或转发给其他用户。
+
+时间语义改进 Prompt：
+我提出共享记录保留首次创建时间 createdAt，而 sharedAt 表示最近一次激活时间；重复共享 active 记录时不更新时间，只有 revoked 重新激活时才更新 sharedAt。请检查这个语义是否合理。
+
+代码检查 Prompt：
+我已经创建 questionShareController.js，并更新 questionReuseController.js 和 questionItemRoutes.js。当前 AI-027 代码未修改，请检查不能共享给自己、唯一共享关系、软撤销、重新激活、接收者只有 use 权限、共享版本查看、撤销后禁止新复用以及已有问卷快照不受影响，并继续教我动态测试。
+
+完成验证 Prompt：
+我已经完成共享与权限、接收者复用、软撤销、已有快照保留、重新激活和时间语义测试，并精确清理临时数据、完成 Jest 回归。请更新 AI-027 日志，不要执行 Git 提交或推送。
+```
+
+### Result 得到什么代码或结果
+
+AI 提供了 `src/controllers/questionShareController.js`，实现题目所有者按用户名共享、查看本人发出的共享、软撤销共享、接收者查看收到的有效共享和查看共享题目的版本。共享关系以 questionItemId 与 sharedWithUserId 的唯一组合保存，避免同一道题向同一用户创建重复记录。
+
+AI 更新了 `src/controllers/questionReuseController.js`，使题目所有者或持有 active、use 共享权限的接收者能够把明确指定的历史版本或当前版本加入本人草稿问卷。复用时仍然复制版本内容并保存 questionItemId、questionVersionId 和 Question 快照，不动态依赖 QuestionItem.currentVersionId。
+
+AI 更新了 `src/routes/questionItemRoutes.js`，增加发出共享、收到共享、共享版本、软撤销和接收者复用所需路由，并把固定的 received-shares 路由放在动态 `/:questionItemId` 路由之前。
+
+共享生命周期测试证明：首次共享创建一条 active 记录；重复共享 active 记录返回 alreadyActive 且不更新时间；软撤销把原记录改为 revoked；重复撤销保持幂等；重新共享时激活同一记录而不创建重复关系。撤销后接收者不能再查看共享版本或新复用题目，但撤销前已经加入问卷的 Question 快照、题目标题和 questionVersionId 均保持不变。
+
+### 是否修改
+
+未修改 AI 提供的 AI-027 业务代码。学生亲自创建和更新对应文件，并提出共享生命周期与时间语义设计：撤销只影响未来复用、已有问卷快照不回收；接收者只具有 use 权限；createdAt 永久表示首次创建时间，sharedAt 表示最近一次激活时间，active 状态重复共享不更新时间，revoked 状态重新激活时才更新 sharedAt。实际代码检查确认已符合该意见，因此没有额外修改业务代码。
+
+### 修改内容
+
+- 新增 `src/controllers/questionShareController.js`，实现按用户名共享、本人发出共享列表、软撤销、收到共享列表和共享版本查询。
+- 更新 `src/controllers/questionReuseController.js`，允许 active、use 权限的共享接收者将指定版本加入本人草稿问卷。
+- 更新 `src/routes/questionItemRoutes.js`，挂载共享和接收者复用相关认证路由，并保证固定路由与动态参数路由顺序正确。
+- 禁止向自己共享题目，目标用户不存在时拒绝共享，并且只有逻辑题目所有者可以建立或撤销共享。
+- 通过唯一共享关系复用原 QuestionShare；首次共享创建记录，软撤销保留记录，重新共享激活原记录。
+- 保留 createdAt 作为首次创建时间；首次共享设置 sharedAt，active 重复共享不修改 sharedAt 和 updatedAt，revoked 重新激活时更新 sharedAt 并清除 revokedAt。
+- 接收者只拥有 use 权限，可以查看有效共享及其版本并复用到自己的草稿问卷，不能创建新版本、恢复历史版本、转发或撤销共享。
+- 共享复用继续要求显式 questionVersionId，并生成独立 Question 内容快照；required、order 和 jumpRules 仍属于问卷实例。
+- 撤销共享后禁止接收者继续查看共享版本和创建新的复用快照，但不删除或修改撤销前已经写入问卷的快照。
+- 精确清理 AI-027 临时共享记录、接收者问卷及两个快照、逻辑题目及两个版本和临时接收者账号。
+
+### 验证结果
+
+- `questionShareController.js`、`questionReuseController.js` 和 `questionItemRoutes.js` 均通过 Node.js 语法检查，应用模块加载成功。
+- 向自己共享返回 400；首次按用户名共享成功，生成 active、use 共享记录。
+- 对 active 共享再次执行共享操作返回 alreadyActive，共享记录 ID、createdAt、sharedAt 和 updatedAt 均保持不变，没有产生重复关系。
+- 所有者发出共享列表与接收者收到共享列表均能读取同一条记录；接收者可以查看 v1、v2 历史版本，结果不包含 passwordHash、令牌或其他敏感认证信息。
+- 接收者不能创建版本、恢复历史、转发共享或撤销共享，相关越权请求均被拒绝。
+- 接收者成功把共享题目的明确 v1 加入本人草稿问卷，返回的 accessType、shareId 和 questionVersionId 均正确。
+- 所有者软撤销后，共享记录 ID 与 createdAt 保持不变，status 变为 revoked、revokedAt 被设置；重复撤销返回 alreadyRevoked，时间和记录数量不变。
+- 撤销后共享从接收者有效列表消失，共享版本与新复用请求均返回 404；此前加入问卷的 v1 快照、标题和版本引用仍然存在且未改变。
+- 重新共享返回 reactivated，继续使用原 shareId，createdAt 保持首次创建时间，sharedAt 更新为最近激活时间，revokedAt 被清除，记录状态恢复为 active。
+- 重新激活后接收者可以继续把明确 v2 加入问卷，最终同一问卷同时保存 v1 和 v2 两份独立内容快照。
+- 保护测试和共享生命周期测试完成后，临时数据已精确清理；只读诊断确认目标用户、问卷、题目、版本和共享记录均不存在。
+- 正式数据库恢复为 users 6、surveys 7、questions 12、responses 3、questionItems 12、questionVersions 12、questionShares 0。
+- 完整 Jest 回归结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-028 本人题目库与指定版本入卷
+
+**日期：** 2026-10-29
+**使用工具：** Codex、Windows PowerShell、Node.js、Express、Mongoose、MongoDB、mongosh、Jest、Supertest
+**状态：** 已完成
+
+### Prompt
+
+```text
+功能范围 Prompt：
+采用精简方案实现最低必要的题目库功能：本人题目库创建、列表、详情、修改名称和说明、加入题目、移除题目、设置推荐版本，以及从题目库把指定版本加入本人草稿问卷。不实现题目库共享、标签、搜索、公开市场或复杂归档。完成整个题目库功能后再统一测试和记录日志。
+
+个人设计意见 Prompt：
+我认为题目库只保存 questionItemId 和 preferredVersionId 引用，不复制题目正文；修改题目库推荐版本只影响以后选题时的建议，不修改已经加入问卷的 Question 快照；从题目库移除题目也不能删除逻辑题目、历史版本或已有问卷数据。
+
+代码检查 Prompt：
+我已经创建 questionBankController.js、questionBankRoutes.js，并更新 app.js。当前 AI-028 代码未修改，请检查题目库所有权、重复名称、重复加题、推荐版本归属、显式版本入卷、草稿状态限制和引用式存储，并一次性教我完成动态测试。
+
+问题修复 Prompt：
+动态测试创建第二个新逻辑题目时出现“数据唯一性冲突”。请检查实际模型和数据库索引，定位原因并教我修复，完成全部测试后再统一清理和回归。
+
+完成验证 Prompt：
+我已经完成 AI-028 动态测试、精确清理临时数据并只运行一次完整 Jest 回归。请更新 AI-028 日志，如实记录最小题目库功能、引用式存储设计意见、动态测试发现并修复的问题、清理和回归结果，不执行 Git 操作。
+```
+
+### Result 得到什么代码或结果
+
+AI 提供了 `src/controllers/questionBankController.js`，实现本人题目库创建、列表、详情、名称和说明修改、加入题目、移除题目、设置推荐版本，以及把题目库中逻辑题目的明确版本加入本人草稿问卷。
+
+AI 提供了 `src/routes/questionBankRoutes.js` 并更新 `src/app.js`，将全部题目库接口放在 JWT 认证和所有权保护下。题目库只管理当前用户拥有的逻辑题目，不扩展题目库共享、标签、搜索、公开市场或复杂归档功能。
+
+从题目库加入问卷时继续复用 AI-026 的显式版本机制：请求指定 questionItemId、questionVersionId 和目标 surveyId，后端验证逻辑题目、版本、题目库和问卷所有权以及草稿状态，然后复制版本内容形成 Question 快照。题目库的 preferredVersionId 仅作为推荐值，不替代请求中明确选择的版本。
+
+动态测试发现 `QuestionItem.legacyQuestionId` 同时配置 `default: null` 和 sparse 唯一索引。MongoDB 会把显式 BSON null 作为索引值，导致创建第二个新逻辑题目时发生唯一性冲突。AI 根据实际错误定位到该模型兼容问题，并建议取消默认 null、仅让迁移旧题目保存 legacyQuestionId，同时清理数据库中已有的显式 null 字段。
+
+### 是否修改
+
+有修改。最初未修改 AI 提供的 AI-028 题目库控制器、路由和应用挂载代码；动态测试发现模型缺陷后，学生亲自删除 `QuestionItem.js` 中 `legacyQuestionId` 的 `default: null`，并使用 `$unset` 清理数据库中 BSON 类型为 null 的 legacyQuestionId。其余 AI-028 业务代码未修改。
+
+学生提出并采用了引用式题目库设计：题目库只保存逻辑题目和推荐版本引用，不复制题目正文；推荐版本变化不追溯修改已有问卷快照；从题目库移除题目不删除逻辑题目、历史版本或已有问卷数据。
+
+### 修改内容
+
+- 新增 `src/controllers/questionBankController.js`，实现题目库创建、本人列表、详情、名称和说明修改、加入题目、移除题目、推荐版本设置及指定版本入卷。
+- 新增 `src/routes/questionBankRoutes.js`，为题目库接口统一配置 JWT 认证。
+- 更新 `src/app.js`，挂载 `/api/question-banks` 路由。
+- 题目库的 `items` 只保存 questionItemId、preferredVersionId、order 和 addedAt，不复制题型、标题、选项或 validation 正文。
+- 创建和查询题目库时只允许访问当前用户的题目库；加入题目时验证逻辑题目属于当前用户且状态有效。
+- 同一用户的题目库名称保持唯一；同一道逻辑题目不能重复加入同一题目库。
+- preferredVersionId 必须属于对应 questionItemId；修改推荐版本不更新已存在的 Question 快照。
+- 从题目库加入问卷时要求明确选择版本，并继续保存 questionItemId、questionVersionId、contentSource 为 library、schemaVersion 为 2 以及独立内容快照。
+- 只允许向本人 draft 问卷加入题目；未登录、他人题目、他人题目库、他人问卷以及 published 或 closed 问卷均被拒绝。
+- 从题目库移除条目只删除题目库内的引用，不删除 QuestionItem、QuestionVersion 或已有 Question 快照。
+- 修改 `src/models/QuestionItem.js`，移除 legacyQuestionId 的 `default: null`，使未迁移的新逻辑题目真正缺少该字段，从而与 sparse 唯一索引语义一致。
+- 使用 `$unset` 清理一个显式 null 的 legacyQuestionId；验证显式 null 数量为 0，后续成功创建不同用户的新逻辑题目。
+- 精确清理 AI-028 临时题目库、问卷及快照、两个逻辑题目、三个版本和临时用户；未扩大删除范围。
+
+### 验证结果
+
+- `questionBankController.js`、`questionBankRoutes.js` 和更新后的 `app.js` 均通过 Node.js 语法检查，应用模块加载成功。
+- 所有者登录成功；未登录访问题目库接口返回 401。
+- 题目库创建、本人列表、详情和名称说明修改成功；同一用户重复名称被唯一性保护拒绝。
+- 本人逻辑题目可以加入题目库；重复加入被拒绝；其他用户的逻辑题目不能加入本人题目库。
+- 推荐版本可以从 v1 调整为 v2，且必须属于对应逻辑题目。
+- 从题目库向本人草稿问卷加入明确的 v1 和 v2 均成功，两份 Question 分别保存对应版本 ID 和内容快照，历史版本与当前版本能够共存。
+- 修改 preferredVersionId 后，已经加入问卷的 v1 快照标题、内容和 questionVersionId 保持不变。
+- MongoDB 原始题目库文档只保存 questionItemId 和 preferredVersionId 等引用字段，没有复制题目正文。
+- 未登录、不同用户越权、非法内容覆盖以及向 published 或 closed 问卷复用均被拒绝，失败操作没有产生额外题目快照。
+- 从题目库移除题目后，逻辑题目、v1 和 v2 历史版本以及已经加入问卷的两个快照均继续存在。
+- 动态测试首次创建其他用户逻辑题目时发现 sparse 唯一索引与 `default: null` 冲突；修复后显式 null 数量为 0，第二个新逻辑题目创建成功，后续全部动态测试通过。
+- 临时数据精确清理后，正式数据库恢复为 users 6、surveys 7、questions 12、responses 3、questionItems 12、questionVersions 12、questionBanks 0、questionShares 0，AI-028 临时用户为 0。
+- 完整 Jest 回归只运行一次，结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-029 单题跨问卷与跨版本统计
+
+**日期：** 2026-10-29
+**使用工具：** Codex、Windows PowerShell、Node.js、Express、Mongoose、MongoDB 聚合、Supertest、Jest
+**状态：** 已完成
+
+### Prompt
+
+```text
+设计 Prompt：
+我认为跨问卷统计必须先按当前用户拥有的问卷过滤，不能因为题目被共享，就让题目所有者查看其他用户问卷的答卷；被共享用户也只能统计自己问卷中的数据。
+
+跨版本统计不应把不同版本的答案直接强行合并。接口可以提供逻辑题目的整体数量汇总，但四种题型的具体结果应按 questionVersionId 分组；选择题在同一版本内按稳定 optionId 统计，不能只按选项文字合并。接口还应支持通过 questionVersionId 查询具体版本。
+
+notAnsweredCount 不应简单使用去重答卷数减回答数。同一逻辑题目可能以不同版本或多个实例出现在问卷中，因此应计算 answerOpportunityCount，即各题目实例对应问卷答卷数之和，再使用 answerOpportunityCount - totalAnswers。responseCount 单独表示纳入统计的去重答卷总数。
+
+实现 Prompt：
+请读取实际统计控制器、题目、版本、问卷、答卷、认证和路由代码，实现 GET /api/question-items/:questionItemId/cross-survey-statistics。只实现本人问卷范围、版本筛选、四种题型分版本统计、权限和敏感字段保护，不实现缓存、导出、图表或跨用户统计。
+
+完成验证 Prompt：
+我已经完成一次性动态测试、精确清理临时数据并只运行一次完整 Jest 回归。请更新 AI-029 日志，记录权限边界、版本分组、answerOpportunityCount、MongoDB 聚合、四种题型、版本筛选、跨用户隔离和敏感字段保护，不执行 Git 操作。
+```
+
+### Result 得到什么代码或结果
+
+AI 提供了 `src/controllers/crossSurveyStatisticsController.js`，实现基于稳定 questionItemId 的单题跨问卷统计。控制器先筛选当前登录用户拥有的问卷，再查找这些问卷中的 Question 实例，使用 MongoDB 聚合统计各问卷答卷数量并按 answers.questionVersionId 收集答案。
+
+AI 更新了 `src/routes/questionItemRoutes.js`，新增经过 JWT 认证的 `GET /api/question-items/:questionItemId/cross-survey-statistics` 路由，并保留已有题目、版本、共享和 usage 路由。
+
+接口同时返回 surveyCount、questionInstanceCount、responseCount、answerOpportunityCount、totalAnswers、notAnsweredCount 和 versionCount；具体题型结果按版本独立返回。单选和多选在版本内部按 optionId 计数，文本题返回回答列表，数字题返回数量、平均值、最小值和最大值。
+
+### 是否修改
+
+未修改 AI 提供的 AI-029 业务代码。学生亲自创建控制器、更新路由、执行一次性动态测试、精确清理临时数据并完成一次完整回归测试。
+
+学生提出并采用了三项设计意见：统计权限以当前用户拥有的问卷为边界；不同版本不强制合并题型结果；使用 answerOpportunityCount 而不是去重 responseCount 计算未回答数量。
+
+### 修改内容
+
+- 新增 `src/controllers/crossSurveyStatisticsController.js`。
+- 更新 `src/routes/questionItemRoutes.js`，挂载跨问卷统计认证路由。
+- 先按 Survey.ownerId 筛选当前用户问卷，再查询这些问卷中引用目标 questionItemId 的题目实例。
+- 题目所有者不会因为共享关系自动获得接收者问卷的答卷数据；共享接收者也只能读取自己问卷中的统计。
+- 支持可选 questionVersionId 参数，并验证版本必须属于目标逻辑题目；非所有者只能筛选本人问卷实际使用的版本。
+- 使用 Response.aggregate 按 surveyId统计答卷数量，并展开 answers 后按 questionVersionId 收集目标题目答案。
+- responseCount 表示纳入范围内的去重答卷数量；answerOpportunityCount 按每个 Question 实例所在问卷的答卷数累加。
+- notAnsweredCount 使用 `answerOpportunityCount - totalAnswers` 计算，能够处理同一逻辑题目在同一问卷出现多个实例的情况。
+- 不同版本始终分别返回版本号、题型、标题、问卷数、实例数、答卷数、回答机会数、回答数和未回答数，不按标题或选项文字强行合并。
+- 单选和多选仅在相同版本内按稳定 optionId 统计；文本和数字统计也分别绑定具体版本。
+- 响应只返回统计和问卷范围信息，不读取或返回 respondentId、答卷者 username、uniqueSubmissionKey、passwordHash 或令牌。
+- 精确清理 3 个临时用户、4 个逻辑题目、5 个版本、4 份问卷、11 个题目快照、5 份答卷和 1 条共享记录。
+
+### 验证结果
+
+- 新控制器和更新后的路由通过 Node.js 语法检查，Express 应用模块加载成功。
+- 未登录访问返回 401；题目所有者读取跨问卷统计成功；无题目使用关系的用户返回 404。
+- 所有者统计只包含本人 3 份问卷，明确排除接收者问卷；接收者统计只包含自己的 1 份问卷，不能读取所有者的 3 份问卷。
+- 同一逻辑题目在本人问卷中包含 4 个实例和 4 份去重答卷，统计得到 answerOpportunityCount 6、totalAnswers 5、notAnsweredCount 1，证明多个实例没有被 responseCount 错误折叠。
+- v1 在 2 份问卷的 3 个实例中统计，responseCount 3、answerOpportunityCount 5、totalAnswers 4、notAnsweredCount 1；v2 独立统计为 1 份问卷、1 个实例和 1 个回答。
+- v1 单选选项 yes 为 3、no 为 1；v2 的 often 为 1、rarely 为 0，两个版本的不同选项没有按文字或位置强行合并。
+- 使用 questionVersionId 筛选 v1 后，只返回 v1 及对应的 2 份问卷、3 个实例、3 份答卷、5 次回答机会和 4 个实际回答。
+- 多选题跨两份问卷统计得到 3 个回答，m1 和 m2 各被选择 2 次。
+- 文本题回答机会为 3、实际回答为 2、未回答为 1，并返回两条文本回答。
+- 数字题返回 3 个回答，平均值 20、最小值 10、最大值 30。
+- 非法 questionVersionId 返回 400；属于其他逻辑题目的版本返回 404。
+- 对统计结果进行字符串检查，未发现 respondentId、username、uniqueSubmissionKey 或 passwordHash。
+- 临时数据精确清理后，正式数据库恢复为 users 6、surveys 7、questions 12、responses 3、questionItems 12、questionVersions 12、questionShares 0、questionBanks 0，AI-029 临时用户为 0。
+- 完整 Jest 回归只运行一次，结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-030 第二阶段前端整合
+
+**日期：** 2026-10-29
+**使用工具：** Codex、HTML、CSS、JavaScript、浏览器及开发者工具、应用内浏览器自动化、Windows PowerShell、MongoDB、mongosh、Jest、Supertest
+**状态：** 已完成
+
+### Prompt
+
+```text
+设计 Prompt：
+我认为第二阶段功能应集中在一个“题目资源管理”页面中，使用简单标签区域切换，不推倒重写第一阶段已有页面。页面复用现有 JWT 和 api.js，只提供课程验收需要的操作，不实现拖拽、图表库、复杂搜索、分页组件或高级视觉效果。
+
+功能 Prompt：
+实现本人可复用题目创建、列表和详情；版本历史、新版本和恢复；使用情况；按用户名共享、发出共享和软撤销；接收共享、查看版本并加入本人草稿问卷；本人题目库管理和指定版本入卷；跨问卷统计和版本筛选；未登录时提示登录，并且不显示敏感身份字段。
+
+验收 Prompt：
+我已经完成 AI-030 第一组验收，请继续完成共享、题目库和跨问卷统计验收。全部功能完成后统一清理临时数据，只运行一次完整 Jest 回归，验证完成前不要更新日志或执行 Git 操作。
+
+完成 Prompt：
+请在全部前端验收、临时数据精确清理和 Jest 回归通过后更新 AI-030 日志，如实记录 AI 提供的前端文件、我的最小页面设计意见、动态验证和最终清理结果。
+```
+
+### Result 得到什么代码或结果
+
+AI 提供了 `public/resources.html`，建立独立的“题目资源管理”页面，并使用四个标签区域组织本人题目、共享题目、题目库和跨问卷统计功能。页面保留返回第一阶段问卷首页的入口，没有重写原有首页、公开填写页或统计页。
+
+AI 提供了 `public/css/resources.css`，实现第二阶段资源页所需的基础布局、标签切换、表单、结果区和状态提示样式，没有引入 UI 框架、图表库或高级视觉效果。
+
+AI 提供了 `public/js/resources.js`，复用现有 `public/js/api.js` 的 JWT 请求机制，连接 AI-025 至 AI-029 已实现的后端接口。脚本支持可复用题目及版本、使用情况、共享生命周期、共享版本入卷、题目库操作、指定版本入卷、跨问卷统计和版本筛选，并对输出结果进行敏感字段过滤。
+
+### 是否修改
+
+未修改 AI 提供的 AI-030 前端代码。学生亲自把 `resources.html`、`resources.css` 和 `resources.js` 复制到项目对应目录，完成语法检查、分组动态验收、临时数据清理和完整回归测试。
+
+学生提出并采用了最小前端整合设计：第二阶段集中使用一个资源管理页面和简单标签切换；复用第一阶段 JWT 与 `api.js`；只实现课程验收必要操作，不增加拖拽、复杂搜索、分页组件、图表库、公开市场或高级视觉效果。
+
+### 修改内容
+
+- 新增 `public/resources.html`，提供本人题目、共享题目、题目库和跨问卷统计四个功能区。
+- 新增 `public/css/resources.css`，提供资源页面独立样式，不影响第一阶段原页面。
+- 新增 `public/js/resources.js`，调用已有认证、题目版本、使用情况、共享、题目库、复用和跨问卷统计接口。
+- 未登录访问资源页时只显示登录提示；登录后显示当前用户及功能区域。
+- 本人题目区域支持创建题目、查看列表和详情、查看版本、创建递增版本、恢复历史版本、查看使用情况，以及把明确版本加入本人草稿问卷。
+- 共享区域支持按用户名共享、查看发出记录、软撤销、查看收到共享及全部版本，以及把明确版本加入接收者自己的草稿问卷。
+- 题目库区域支持创建、列表、名称说明修改、加入题目、移除题目、推荐版本设置和指定版本入卷。
+- 跨问卷统计区域支持全部版本统计和指定 questionVersionId 筛选，并显示问卷数、题目实例数、去重答卷数、回答机会数、实际回答数和未回答数。
+- 结果展示过滤 `passwordHash`、`token`、`respondentId` 和 `uniqueSubmissionKey` 等敏感字段。
+- 第二阶段前端没有修改第一阶段已有 `index.html`、`styles.css`、认证页面、问卷页面或统计页面。
+
+### 验证结果
+
+- `resources.js` 通过 Node.js 语法检查；`resources.html` 的 CSS、`api.js` 和 `resources.js` 引用正确，Express 应用模块加载成功。
+- 未登录访问 `/resources.html` 时显示“需要登录”，不会展示题目资源数据；使用第一阶段账号登录后可以恢复资源页登录状态。
+- 本人题目组验证通过：创建单选可复用题目 v1，创建保留稳定 optionId 的 v2，恢复 v1 内容生成 v3；历史 v1 和 v2 保持不变，currentVersionId 指向 v3。
+- 使用情况和显式版本入卷验证通过；同一逻辑题目的 v1、v3 可以同时形成独立 Question 快照，版本变化不会自动升级已有问卷。
+- 共享组验证通过：所有者按用户名共享后，接收者看到同一逻辑题目的 v1、v2、v3，权限为 use；接收者成功把明确 v2 作为必答题加入自己的草稿问卷。
+- 所有者软撤销后，接收者收到共享数量变为 0，不能继续从共享入口新复用；接收者问卷中的 v2 标题、必答状态和版本快照继续存在。
+- 再次共享后原共享记录 ID `6ae2fe67f365197e10925b3d` 重新变为 active，接收者再次看到三个版本，证明软撤销和重新激活的前端流程有效。
+- 题目库组验证通过：创建并修改题目库名称和说明，加入逻辑题目，将推荐版本从 v3 改为 v2，并从题目库把明确 v1 加入本人草稿问卷。
+- 从题目库移除条目后 itemCount 变为 0；源逻辑题目和三个历史版本仍可读取，已有问卷快照和跨问卷统计不受影响。
+- 跨问卷统计组验证通过：全部版本统计只包含当前用户 1 份问卷和 4 个题目实例；v1 筛选只返回 2 个 v1 实例；刷新全部数据后仍能重新读取统计。
+- 当前临时问卷没有答卷，因此 responseCount、answerOpportunityCount、totalAnswers 和 notAnsweredCount 均为 0；字段含义和版本分组展示正确。
+- 页面统计和结果输出未出现 `respondentId`、`uniqueSubmissionKey` 等敏感字段；浏览器控制台 error 日志为空。
+- 清理前执行只读对象关系检查，确认 2 份临时问卷、6 个临时题目快照、1 个逻辑题目、3 个版本、1 个题目库、1 个共享和 1 个临时接收用户关系唯一，并且没有答卷、其他问卷引用、其他共享或题目库引用。
+- 精确清理后全部 AI-030 目标对象数量为 0；正式数据库恢复为 users 6、surveys 7、questions 12、responses 3、questionItems 12、questionVersions 12、questionShares 0、questionBanks 0。
+- 完整 Jest 回归只运行一次，结果为 2 个测试套件、8 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-031 第二阶段自动化 API 测试与答案版本快照修复
+
+**日期：** 2026-10-29
+**使用工具：** Codex、Node.js、Express、Jest、Supertest、MongoDB、Mongoose、Windows PowerShell、mongosh
+**状态：** 已完成
+
+### Prompt
+
+```text
+测试设计 Prompt：
+请为第二阶段新增功能编写最小但完整的自动化 API 测试，覆盖可复用题目版本、恢复生成新版本、指定版本入卷、共享与软撤销、题目库、使用情况和跨问卷统计。继续使用独立测试数据库，测试后必须清理端口和数据库。先读取现有 Jest 架构并设计测试范围，不修改业务代码；测试文件由我亲自创建，完成全部验证后再统一更新日志，不执行 Git 提交或推送。
+
+测试实现 Prompt：
+根据现有 globalSetup、globalTeardown、testServer 和第一阶段测试风格，提供完整的 tests/stage2-resources.test.js。新增测试应覆盖版本递增和不可变恢复、明确版本引用与题目快照、共享撤销和重新激活、题目库引用式存储、跨问卷按版本统计、认证和所有权保护。
+
+问题修复 Prompt：
+新增 6 项测试中有 5 项通过，但跨问卷统计的 answerOpportunityCount 正确而 totalAnswers 预期为 2、实际为 0。请根据真实数据链路定位原因，不要通过修改测试期望掩盖问题，并教我完成兼容第一阶段普通题目的最小修复。
+
+完成 Prompt：
+第二阶段新增测试、完整 Jest 回归、3101 端口清理、测试数据库清理和测试进程检查均已通过。请如实记录最初失败、实际原因、我的代码修改和最终验证结果，不执行 Git 操作。
+```
+
+### Result 得到什么代码或结果
+
+AI 读取并分析了现有 Jest 架构，确认测试由 `tests/globalSetup.js` 启动独立服务器，`tests/testServer.js` 固定使用 3101 端口和 `questionnaire_system_test` 数据库，`tests/globalTeardown.js` 负责关闭服务器并删除测试数据库；现有第一阶段测试无需改动。
+
+AI 提供了完整的 `tests/stage2-resources.test.js`，新增 6 项第二阶段 API 测试，覆盖可复用题目版本与恢复、指定版本入卷与 usage、共享及软撤销、题目库、跨问卷统计，以及认证、所有权和问卷状态保护。
+
+第一次单独执行新增测试时，版本、入卷、共享、题目库和权限保护 5 项通过，跨问卷统计测试失败：统计可以正确得到 2 份问卷、3 个题目实例、2 份答卷和 3 次回答机会，但 `totalAnswers` 预期为 2、实际为 0。
+
+AI 沿 `Question` 快照、`buildSubmission`、`Response.answers` 和跨问卷 MongoDB 聚合链路定位到真实原因：第二阶段 Question 已保存 `questionItemId` 和 `questionVersionId`，Response 模型及迁移脚本也支持这两个字段，但新答卷提交时没有把它们复制到答案快照；跨问卷统计按这两个字段匹配答案，因此无法把新答案归入具体逻辑题目和版本。
+
+### 是否修改
+
+学生最初未修改 AI 提供的 `tests/stage2-resources.test.js`，亲自创建文件并执行语法检查和新增测试。
+
+自动化测试发现真实集成问题后，学生修改了 `src/services/responseValidationService.js` 和 `src/controllers/responseController.js`。测试断言没有降低或改成错误的 0，跨问卷统计控制器也没有通过特殊测试分支绕过问题。
+
+学生提出并采用了兼容设计：新答案必须从实际 Question 快照复制 `questionItemId` 和 `questionVersionId`；只有问卷中的全部题目都是第二阶段版本化题目时，才将新 Response 标记为 `schemaVersion: 2`。混合使用第一阶段普通题目和第二阶段复用题目时保持 `schemaVersion: 1`，但复用题目的答案仍保存版本引用，保证统计可用并避免破坏第一阶段数据。
+
+### 修改内容
+
+- 新增 `tests/stage2-resources.test.js`，使用 Supertest 调用运行在 3101 端口的真实 Express 测试服务器。
+- 可复用题目测试验证 v1、v2 和恢复生成的 v3 同时存在；v2 的 parentVersionId 指向 v1，v3 的 parentVersionId 指向 v2、restoredFromVersionId 指向 v1，历史版本内容不被覆盖。
+- 指定版本入卷测试验证 Question 保存 `questionItemId`、实际采用的 `questionVersionId`、`contentSource: library`、`schemaVersion: 2` 及内容快照，逻辑题目后来产生新版本时已有问卷快照不自动升级。
+- usage 测试验证同一逻辑题目的不同版本可以在问卷中共存，并正确返回 usageCount、surveyCount 和各版本使用数量。
+- 共享测试验证唯一共享关系、接收者 use 权限、明确版本复用、软撤销后阻止新复用、已有问卷快照保留，以及重新激活时继续使用原 shareId。
+- 题目库测试验证创建、列表、修改、加入题目、拒绝重复加入、推荐版本修改、明确历史版本入卷和移除条目；移除后逻辑题目、历史版本和已有问卷快照继续存在。
+- 跨问卷统计测试验证只统计当前用户拥有的问卷，按 v1、v2 分组，返回 surveyCount、questionInstanceCount、responseCount、answerOpportunityCount、totalAnswers 和 notAnsweredCount，并支持 questionVersionId 筛选和跨用户数据隔离。
+- 权限和状态测试验证未登录返回 401、不同用户越权返回 404，以及已发布或已关闭问卷不能继续复用题目。
+- 在 `src/services/responseValidationService.js` 的答案快照中增加 `questionItemId` 和 `questionVersionId`，来源为实际填写的 Question 快照。
+- 在 `src/controllers/responseController.js` 中判断问卷是否全部采用版本化题目；全部版本化时写入 `schemaVersion: 2`，混合或第一阶段题目保持 `schemaVersion: 1`。
+- 测试数据全部使用运行时生成的唯一用户名、逻辑题目、问卷、共享和题目库，不依赖正式数据库中的现有账号或业务数据。
+
+### 验证结果
+
+- `tests/stage2-resources.test.js`、`responseValidationService.js` 和 `responseController.js` 均通过 Node.js 语法检查，Express 应用模块加载成功。
+- 第一次单独执行 AI-031 测试时，6 项中 5 项通过；唯一失败准确复现新答卷缺少逻辑题目和版本引用的问题，错误为 `totalAnswers` 预期 2、实际 0。
+- 修复后重新单独运行 AI-031，6 项第二阶段测试全部通过，跨问卷统计能够把新提交答案归入正确的 questionItemId 和 questionVersionId。
+- 版本历史测试通过：创建新版本递增，恢复历史版本生成新版本，原有版本保持不可变。
+- 指定版本入卷、内容快照、usage、共享软撤销、重新激活、题目库引用、推荐版本和已有快照保护均通过。
+- 跨问卷统计得到 2 份本人问卷、3 个题目实例、2 份答卷、3 次回答机会、2 个实际回答和 1 个未回答；v1、v2 分组、版本筛选及接收者问卷隔离通过。
+- 统计响应未包含 respondentId、答卷者 username 或 uniqueSubmissionKey。
+- 完整 Jest 回归结果为 3 个测试套件、14 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`，没有遗留 `tests/testServer.js` 测试服务器进程。
+- 正式数据库没有被测试清理逻辑访问或删除。
+- 本阶段没有执行 Git 提交或推送。
+
+## AI-032 第二阶段收尾验收与提交文档补齐
+
+**日期：** 2026-10-29
+**使用工具：** Codex、Windows PowerShell、Node.js、MongoDB、mongosh、Jest、Supertest、Git 只读检查
+**状态：** 已完成
+
+### Prompt
+
+```text
+验收 Prompt：
+请重新读取第一阶段作业文档、第二阶段需求变更文档、第二阶段需求基线、数据库设计、当前业务代码、前端、测试和 AI 使用日志，逐项对照第二阶段八项要求。先只输出已完成、缺失、需要补充的文档、提交风险和是否存在超出要求的冗余功能，不修改业务代码，不执行 Git 操作。
+
+收尾 Prompt：
+第二阶段八项主要功能已经完成。请按提交优先级一个一个补齐文档，不再增加非必要业务功能；文档需要准确反映实际代码、数据迁移、测试和 AI 使用情况。
+
+报告精简 Prompt：
+根据老师的提交截图，第二阶段只需要在第一阶段 GitHub 仓库上传修改后的代码，并提交项目完成报告 PDF。报告最前面放仓库链接，文件名为 2026_ECNU_PJ1_2_白淑静.pdf。请删除与作业要求无关的冗余内容，只保留项目目标、第二阶段需求、系统和数据库设计、关键实现、迁移、测试、问题解决、AI 使用和总结。
+
+最终检查 Prompt：
+检查第二阶段文档是否齐全，运行最终完整 Jest 测试，检查测试端口和数据库清理情况，并确认 .env、node_modules、备份和临时文件没有进入 Git 候选文件。通过后更新 AI-032，不记录 Git 提交和上传过程。
+```
+
+### Result 得到什么代码或结果
+
+AI 对照两份作业文档和第二阶段八项需求完成收尾验收，确认题目保存与复用、共享、旧问卷保护、历史版本恢复、多版本共存、使用情况、题目库和跨问卷统计均已实现。第一阶段用户、问卷、题目、答卷、匿名、跳转、统计和测试功能继续保留。
+
+AI 发现业务功能已经基本完成，当前主要缺口是第二阶段提交文档没有完整反映新增模型、接口、迁移、测试和 AI 使用过程，因此建议停止增加非必要功能，优先补齐文档和执行最终提交检查。
+
+AI 提供了更新后的 `README.md`，以及完整的 `docs/API说明.md`、`docs/关键逻辑说明.md`、`docs/测试用例与结果.md`、`docs/数据迁移说明.md`、`docs/AI使用说明.md` 和 `docs/第二阶段项目完成报告.md` 内容。
+
+根据老师提交截图，AI 将最初较长的第二阶段报告精简为只包含课程要求所需内容的版本，并确认报告最前面包含 GitHub 仓库地址，最终 PDF 应命名为 `2026_ECNU_PJ1_2_白淑静.pdf`。
+
+### 是否修改
+
+学生亲自使用 UTF-8 保存和更新了第二阶段提交文档。AI-032 没有修改业务代码，没有新增接口或数据库集合。
+
+学生根据提交要求提出报告不应重复 API 文档、运行手册和全部实现细节，只需覆盖作业文档要求。根据该意见，第二阶段完成报告从过长版本精简为项目目标、八项需求、系统设计、MongoDB 设计、关键实现、数据迁移、测试、问题解决、AI 使用和总结。
+
+### 修改内容
+
+- 更新 `README.md`，补充第二阶段功能、技术栈、数据集合、迁移命令、测试结果、页面入口、文档目录和提交排除项。
+- 更新 `docs/API说明.md`，统一记录第一阶段与第二阶段接口路径、认证要求、请求字段、响应结构、状态码、权限和敏感字段保护。
+- 更新 `docs/关键逻辑说明.md`，补充不可变版本、恢复生成新版本、显式版本入卷、共享软撤销、题目库引用式存储、跨问卷统计和迁移兼容逻辑。
+- 更新 `docs/测试用例与结果.md`，记录第一阶段 8 项和第二阶段 6 项自动化测试的步骤、输入、预期结果、实际结果与结论，并记录迁移及前端验收结果。
+- 新增 `docs/数据迁移说明.md`，记录备份、旧数据基线、默认 dry-run、显式 `--apply`、引用检查、第一次迁移、第二次幂等迁移、问题修复和回滚方案。
+- 更新 `docs/AI使用说明.md`，总结 AI 在两个阶段提供的帮助、AI 出现的问题、学生完成的修改、学生提出的设计和验证方法。
+- 新增并精简 `docs/第二阶段项目完成报告.md`，报告最前面放置 GitHub 仓库链接，正文只保留作业要求相关内容。
+- 未把 Git 初始化、提交、GitHub 推送或上传过程写入 AI 日志。
+
+### 验证结果
+
+- 最终检查确认 `README.md`、第二阶段需求基线、数据库设计、API 说明、关键逻辑说明、数据迁移说明、测试用例与结果、AI 使用日志、AI 使用说明和第二阶段完成报告共 10 个必要文档全部存在且文件大小大于 0。
+- 第二阶段完成报告最前面包含仓库地址 `https://github.com/zhuzhuxia-123-b/questionnaire-system`，并包含姓名白淑静、学号 10245501436、第二阶段名称和完成日期。
+- 最终完整 Jest 回归结果为 3 个测试套件、14 项测试全部通过，无失败和快照。
+- 测试结束后 3101 端口未继续监听，`questionnaire_system_test` 集合列表为 `[]`。
+- `.env` 被 `.gitignore` 的 `.env` 规则排除，`node_modules` 被 `node_modules/` 规则排除。
+- Git 已跟踪风险文件数量为 0；本次 34 个修改或新增候选文件中风险文件数量为 0。
+- 检查范围内没有发现 `.env`、`node_modules`、coverage、数据库备份、日志、tmp、bak 或 old 临时文件进入提交候选。
+- 本阶段没有执行 Git 提交或推送。
+

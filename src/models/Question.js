@@ -109,7 +109,12 @@ const questionSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ['singleChoice', 'multipleChoice', 'text', 'number'],
+      enum: [
+        'singleChoice',
+        'multipleChoice',
+        'text',
+        'number',
+      ],
     },
     title: {
       type: String,
@@ -133,6 +138,26 @@ const questionSchema = new Schema(
       type: [jumpRuleSchema],
       default: [],
     },
+    questionItemId: {
+      type: Schema.Types.ObjectId,
+      ref: 'QuestionItem',
+      default: null,
+    },
+    questionVersionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'QuestionVersion',
+      default: null,
+    },
+    contentSource: {
+      type: String,
+      enum: ['legacy', 'library'],
+      default: null,
+    },
+    schemaVersion: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
   },
   {
     timestamps: true,
@@ -140,78 +165,156 @@ const questionSchema = new Schema(
   }
 );
 
-questionSchema.index({ surveyId: 1, order: 1 }, { unique: true });
-
-questionSchema.pre('validate', function validateQuestion() {
-  const choiceTypes = ['singleChoice', 'multipleChoice'];
-  const isChoice = choiceTypes.includes(this.type);
-
-  if (isChoice && this.options.length < 2) {
-    this.invalidate('options', '单选题和多选题至少需要两个选项');
+questionSchema.index(
+  {
+    surveyId: 1,
+    order: 1,
+  },
+  {
+    unique: true,
   }
+);
 
-  if (!isChoice && this.options.length > 0) {
-    this.invalidate('options', '文本题和数字题不能包含选项');
-  }
-
-  const optionIds = this.options.map((option) => option.optionId);
-  if (new Set(optionIds).size !== optionIds.length) {
-    this.invalidate('options', '同一道题中的 optionId 不能重复');
-  }
-
-  const validation = this.validation || {};
-
-  if (
-    this.type === 'multipleChoice' &&
-    validation.minSelections !== undefined &&
-    validation.maxSelections !== undefined &&
-    validation.minSelections > validation.maxSelections
-  ) {
-    this.invalidate(
-      'validation.maxSelections',
-      '最多选择数量不能小于最少选择数量'
-    );
-  }
-
-  if (
-    this.type === 'text' &&
-    validation.minLength !== undefined &&
-    validation.maxLength !== undefined &&
-    validation.minLength > validation.maxLength
-  ) {
-    this.invalidate(
-      'validation.maxLength',
-      '最大文本长度不能小于最小文本长度'
-    );
-  }
-
-  if (
-    this.type === 'number' &&
-    validation.minValue !== undefined &&
-    validation.maxValue !== undefined &&
-    validation.minValue > validation.maxValue
-  ) {
-    this.invalidate(
-      'validation.maxValue',
-      '最大值不能小于最小值'
-    );
-  }
-
-  for (const rule of this.jumpRules) {
-    if (rule.action === 'goto' && !rule.targetQuestionId) {
-      this.invalidate(
-        'jumpRules',
-        'goto 跳转规则必须设置 targetQuestionId'
-      );
-    }
-
-    if (rule.action === 'submit' && rule.targetQuestionId) {
-      this.invalidate(
-        'jumpRules',
-        'submit 规则不能设置 targetQuestionId'
-      );
-    }
-  }
+questionSchema.index({
+  questionItemId: 1,
+  surveyId: 1,
 });
 
-module.exports = mongoose.model('Question', questionSchema);
+questionSchema.index({
+  questionVersionId: 1,
+  surveyId: 1,
+});
+
+questionSchema.index({
+  surveyId: 1,
+  questionVersionId: 1,
+});
+
+questionSchema.pre(
+  'validate',
+  function validateQuestion() {
+    const choiceTypes = [
+      'singleChoice',
+      'multipleChoice',
+    ];
+
+    const isChoice = choiceTypes.includes(this.type);
+
+    if (isChoice && this.options.length < 2) {
+      this.invalidate(
+        'options',
+        '单选题和多选题至少需要两个选项'
+      );
+    }
+
+    if (!isChoice && this.options.length > 0) {
+      this.invalidate(
+        'options',
+        '文本题和数字题不能包含选项'
+      );
+    }
+
+    const optionIds = this.options.map(
+      (option) => option.optionId
+    );
+
+    if (
+      new Set(optionIds).size !== optionIds.length
+    ) {
+      this.invalidate(
+        'options',
+        '同一道题中的 optionId 不能重复'
+      );
+    }
+
+    const validation = this.validation || {};
+
+    if (
+      this.type === 'multipleChoice' &&
+      validation.minSelections !== undefined &&
+      validation.maxSelections !== undefined &&
+      validation.minSelections >
+        validation.maxSelections
+    ) {
+      this.invalidate(
+        'validation.maxSelections',
+        '最多选择数量不能小于最少选择数量'
+      );
+    }
+
+    if (
+      this.type === 'text' &&
+      validation.minLength !== undefined &&
+      validation.maxLength !== undefined &&
+      validation.minLength >
+        validation.maxLength
+    ) {
+      this.invalidate(
+        'validation.maxLength',
+        '最大文本长度不能小于最小文本长度'
+      );
+    }
+
+    if (
+      this.type === 'number' &&
+      validation.minValue !== undefined &&
+      validation.maxValue !== undefined &&
+      validation.minValue > validation.maxValue
+    ) {
+      this.invalidate(
+        'validation.maxValue',
+        '最大值不能小于最小值'
+      );
+    }
+
+    for (const rule of this.jumpRules) {
+      if (
+        rule.action === 'goto' &&
+        !rule.targetQuestionId
+      ) {
+        this.invalidate(
+          'jumpRules',
+          'goto 跳转规则必须设置 targetQuestionId'
+        );
+      }
+
+      if (
+        rule.action === 'submit' &&
+        rule.targetQuestionId
+      ) {
+        this.invalidate(
+          'jumpRules',
+          'submit 规则不能设置 targetQuestionId'
+        );
+      }
+    }
+
+    if (this.schemaVersion >= 2) {
+      if (!this.questionItemId) {
+        this.invalidate(
+          'questionItemId',
+          '第二阶段题目必须关联逻辑题目'
+        );
+      }
+
+      if (!this.questionVersionId) {
+        this.invalidate(
+          'questionVersionId',
+          '第二阶段题目必须关联题目版本'
+        );
+      }
+
+      if (!this.contentSource) {
+        this.invalidate(
+          'contentSource',
+          '第二阶段题目必须记录内容来源'
+        );
+      }
+    }
+  }
+);
+
+module.exports = mongoose.model(
+  'Question',
+  questionSchema
+);

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>题目资源管理</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/resources.css">
+</head>
+<body>
+  <header class="site-header resource-header">
+    <div>
+      <h1>题目资源管理</h1>
+      <p>可复用题目、共享、题目库和跨问卷统计</p>
+    </div>
+    <a class="resource-home-link" href="/">
+      返回问卷首页
+    </a>
+  </header>
+
+  <main class="page-container resource-page">
+    <section id="resource-auth-gate" class="card" hidden>
+      <h2>需要登录</h2>
+      <p>请先在问卷首页登录，再打开本页面。</p>
+      <a class="resource-link-button" href="/">前往登录</a>
+    </section>
+
+    <section id="resource-app" hidden>
+      <section class="card resource-toolbar">
+        <div>
+          <strong id="resource-current-user"></strong>
+          <span id="resource-data-summary"></span>
+        </div>
+        <button
+          id="resource-refresh-all"
+          type="button"
+          class="button-secondary compact-button"
+        >
+          刷新全部
+        </button>
+      </section>
+
+      <p
+        id="resource-message"
+        class="form-message"
+        role="status"
+      ></p>
+
+      <nav
+        class="resource-tabs"
+        aria-label="题目资源功能"
+      >
+        <button type="button" data-resource-tab="items" class="is-active">
+          本人题目
+        </button>
+        <button type="button" data-resource-tab="shares">
+          共享题目
+        </button>
+        <button type="button" data-resource-tab="banks">
+          题目库
+        </button>
+        <button type="button" data-resource-tab="statistics">
+          跨问卷统计
+        </button>
+      </nav>
+
+      <section data-resource-panel="items">
+        <div class="resource-grid">
+          <form id="create-resource-item-form" class="card">
+            <h2>创建可复用题目</h2>
+
+            <label for="create-resource-type">题型</label>
+            <select id="create-resource-type" name="type">
+              <option value="singleChoice">单选题</option>
+              <option value="multipleChoice">多选题</option>
+              <option value="text">文本题</option>
+              <option value="number">数字题</option>
+            </select>
+
+            <label for="create-resource-title">题目内容</label>
+            <textarea
+              id="create-resource-title"
+              name="title"
+              rows="3"
+              maxlength="500"
+              required
+            ></textarea>
+
+            <label for="create-resource-options">
+              选项（每行 label，或 optionId|label）
+            </label>
+            <textarea
+              id="create-resource-options"
+              name="options"
+              rows="5"
+            ></textarea>
+
+            <label for="create-resource-validation">
+              validation JSON（可留空）
+            </label>
+            <textarea
+              id="create-resource-validation"
+              name="validation"
+              rows="4"
+              placeholder='例如 {"maxLength":200}'
+            ></textarea>
+
+            <label for="create-resource-note">版本说明</label>
+            <input
+              id="create-resource-note"
+              name="changeNote"
+              type="text"
+              maxlength="1000"
+              value="创建初始版本"
+            >
+
+            <button type="submit">创建题目</button>
+          </form>
+
+          <section class="card">
+            <div class="section-heading">
+              <div>
+                <h2>本人题目</h2>
+                <p>选择题目后可查看详情、版本和使用情况。</p>
+              </div>
+              <button
+                id="refresh-own-items"
+                type="button"
+                class="button-secondary compact-button"
+              >
+                刷新
+              </button>
+            </div>
+
+            <label for="own-item-select">可复用题目</label>
+            <select id="own-item-select"></select>
+
+            <div class="resource-actions">
+              <button id="load-own-detail" type="button">查看详情</button>
+              <button id="load-own-versions" type="button">查看版本</button>
+              <button id="load-own-usage" type="button">查看使用情况</button>
+            </div>
+
+            <pre id="own-item-output" class="resource-output"></pre>
+          </section>
+        </div>
+
+        <div class="resource-grid">
+          <form id="create-resource-version-form" class="card">
+            <h2>创建新版本</h2>
+            <p>选择本人题目后，当前版本内容会填入表单。</p>
+
+            <label for="version-resource-type">题型</label>
+            <select id="version-resource-type" name="type">
+              <option value="singleChoice">单选题</option>
+              <option value="multipleChoice">多选题</option>
+              <option value="text">文本题</option>
+              <option value="number">数字题</option>
+            </select>
+
+            <label for="version-resource-title">题目内容</label>
+            <textarea
+              id="version-resource-title"
+              name="title"
+              rows="3"
+              maxlength="500"
+              required
+            ></textarea>
+
+            <label for="version-resource-options">
+              选项（保留 optionId 可保持稳定选项身份）
+            </label>
+            <textarea
+              id="version-resource-options"
+              name="options"
+              rows="5"
+            ></textarea>
+
+            <label for="version-resource-validation">validation JSON</label>
+            <textarea
+              id="version-resource-validation"
+              name="validation"
+              rows="4"
+            ></textarea>
+
+            <label for="version-resource-note">修改说明</label>
+            <input
+              id="version-resource-note"
+              name="changeNote"
+              type="text"
+              maxlength="1000"
+              required
+            >
+
+            <button type="submit">创建新版本</button>
+          </form>
+
+          <section class="card">
+            <h2>版本操作</h2>
+
+            <label for="own-version-select">题目版本</label>
+            <select id="own-version-select"></select>
+
+            <label for="restore-change-note">恢复说明</label>
+            <input
+              id="restore-change-note"
+              type="text"
+              maxlength="1000"
+              value="从历史版本恢复"
+            >
+
+            <button id="restore-version-button" type="button">
+              恢复所选版本（生成新版本）
+            </button>
+
+            <hr>
+
+            <label for="own-target-survey">加入草稿问卷</label>
+            <select id="own-target-survey"></select>
+
+            <label class="checkbox-row">
+              <input id="own-version-required" type="checkbox">
+              <span>设为必答题</span>
+            </label>
+
+            <button id="add-own-version-to-survey" type="button">
+              将所选版本加入问卷
+            </button>
+
+            <pre id="own-version-output" class="resource-output"></pre>
+          </section>
+        </div>
+      </section>
+
+      <section data-resource-panel="shares" hidden>
+        <div class="resource-grid">
+          <section class="card">
+            <h2>发出共享</h2>
+            <label for="share-own-item-select">本人题目</label>
+            <select id="share-own-item-select"></select>
+
+            <form id="share-resource-form">
+              <label for="share-recipient-username">接收者用户名</label>
+              <input
+                id="share-recipient-username"
+                name="username"
+                type="text"
+                minlength="3"
+                maxlength="30"
+                required
+              >
+              <button type="submit">共享题目</button>
+            </form>
+
+            <button id="refresh-sent-shares" type="button" class="button-secondary">
+              刷新发出共享
+            </button>
+            <div id="sent-share-list" class="resource-list"></div>
+          </section>
+
+          <section class="card">
+            <div class="section-heading">
+              <div>
+                <h2>收到的共享</h2>
+                <p>只能查看版本并加入自己的草稿问卷。</p>
+              </div>
+              <button
+                id="refresh-received-items"
+                type="button"
+                class="button-secondary compact-button"
+              >刷新</button>
+            </div>
+
+            <label for="received-item-select">共享题目</label>
+            <select id="received-item-select"></select>
+
+            <label for="received-version-select">版本</label>
+            <select id="received-version-select"></select>
+
+            <label for="received-target-survey">加入草稿问卷</label>
+            <select id="received-target-survey"></select>
+
+            <label class="checkbox-row">
+              <input id="received-required" type="checkbox">
+              <span>设为必答题</span>
+            </label>
+
+            <button id="add-received-version-to-survey" type="button">
+              将共享版本加入问卷
+            </button>
+
+            <pre id="received-output" class="resource-output"></pre>
+          </section>
+        </div>
+      </section>
+
+      <section data-resource-panel="banks" hidden>
+        <div class="resource-grid">
+          <form id="create-bank-form" class="card">
+            <h2>创建题目库</h2>
+            <label for="create-bank-name">名称</label>
+            <input id="create-bank-name" name="name" maxlength="100" required>
+            <label for="create-bank-description">说明</label>
+            <textarea id="create-bank-description" name="description" rows="4" maxlength="1000"></textarea>
+            <button type="submit">创建题目库</button>
+          </form>
+
+          <section class="card">
+            <div class="section-heading">
+              <h2>本人题目库</h2>
+              <button id="refresh-banks" type="button" class="button-secondary compact-button">刷新</button>
+            </div>
+            <label for="bank-select">题目库</label>
+            <select id="bank-select"></select>
+
+            <form id="update-bank-form">
+              <label for="update-bank-name">名称</label>
+              <input id="update-bank-name" name="name" maxlength="100" required>
+              <label for="update-bank-description">说明</label>
+              <textarea id="update-bank-description" name="description" rows="3" maxlength="1000"></textarea>
+              <button type="submit">保存名称和说明</button>
+            </form>
+          </section>
+        </div>
+
+        <div class="resource-grid">
+          <section class="card">
+            <h2>向题目库加入题目</h2>
+            <label for="bank-add-item-select">本人题目</label>
+            <select id="bank-add-item-select"></select>
+            <label for="bank-add-version-select">推荐版本</label>
+            <select id="bank-add-version-select"></select>
+            <button id="add-item-to-bank" type="button">加入题目库</button>
+          </section>
+
+          <section class="card">
+            <h2>题目库条目操作</h2>
+            <label for="bank-item-select">题目库条目</label>
+            <select id="bank-item-select"></select>
+            <label for="bank-item-version-select">指定版本</label>
+            <select id="bank-item-version-select"></select>
+            <label for="bank-target-survey">目标草稿问卷</label>
+            <select id="bank-target-survey"></select>
+            <label class="checkbox-row">
+              <input id="bank-item-required" type="checkbox">
+              <span>加入问卷时设为必答题</span>
+            </label>
+            <div class="resource-actions">
+              <button id="set-bank-preferred-version" type="button">设为推荐版本</button>
+              <button id="add-bank-item-to-survey" type="button">指定版本入卷</button>
+              <button id="remove-bank-item" type="button" class="button-danger">从题目库移除</button>
+            </div>
+            <pre id="bank-output" class="resource-output"></pre>
+          </section>
+        </div>
+      </section>
+
+      <section data-resource-panel="statistics" hidden>
+        <section class="card">
+          <h2>单题跨问卷统计</h2>
+          <p>只统计当前用户拥有的问卷，不显示答卷者身份。</p>
+
+          <label for="statistics-item-select">本人或已接收题目</label>
+          <select id="statistics-item-select"></select>
+
+          <label for="statistics-version-select">版本筛选</label>
+          <select id="statistics-version-select"></select>
+
+          <button id="load-cross-statistics" type="button">读取统计</button>
+
+          <div id="statistics-summary" class="resource-summary"></div>
+          <pre id="statistics-output" class="resource-output"></pre>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script src="/js/api.js" defer></script>
+  <script src="/js/resources.js" defer></script>
+</body>
+</html>

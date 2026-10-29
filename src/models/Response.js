@@ -26,10 +26,25 @@ const answerSchema = new Schema(
       ref: 'Question',
       required: true,
     },
+    questionItemId: {
+      type: Schema.Types.ObjectId,
+      ref: 'QuestionItem',
+      default: null,
+    },
+    questionVersionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'QuestionVersion',
+      default: null,
+    },
     questionType: {
       type: String,
       required: true,
-      enum: ['singleChoice', 'multipleChoice', 'text', 'number'],
+      enum: [
+        'singleChoice',
+        'multipleChoice',
+        'text',
+        'number',
+      ],
     },
     questionTitle: {
       type: String,
@@ -86,6 +101,12 @@ const responseSchema = new Schema(
       default: 1,
       min: 1,
     },
+    schemaVersion: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1,
+    },
     uniqueSubmissionKey: {
       type: String,
       trim: true,
@@ -102,11 +123,61 @@ const responseSchema = new Schema(
 );
 
 responseSchema.index(
-  { uniqueSubmissionKey: 1 },
-  { unique: true, sparse: true }
+  {
+    uniqueSubmissionKey: 1,
+  },
+  {
+    unique: true,
+    sparse: true,
+  }
 );
 
-responseSchema.index({ surveyId: 1, submittedAt: -1 });
-responseSchema.index({ surveyId: 1, respondentId: 1 });
+responseSchema.index({
+  surveyId: 1,
+  submittedAt: -1,
+});
 
-module.exports = mongoose.model('Response', responseSchema);
+responseSchema.index({
+  surveyId: 1,
+  respondentId: 1,
+});
+
+responseSchema.index({
+  'answers.questionItemId': 1,
+  surveyId: 1,
+});
+
+responseSchema.index({
+  'answers.questionVersionId': 1,
+  surveyId: 1,
+});
+
+responseSchema.pre(
+  'validate',
+  function validateResponseVersion() {
+    if (this.schemaVersion < 2) {
+      return;
+    }
+
+    this.answers.forEach((answer, index) => {
+      if (!answer.questionItemId) {
+        this.invalidate(
+          `answers.${index}.questionItemId`,
+          '第二阶段答案必须关联逻辑题目'
+        );
+      }
+
+      if (!answer.questionVersionId) {
+        this.invalidate(
+          `answers.${index}.questionVersionId`,
+          '第二阶段答案必须关联题目版本'
+        );
+      }
+    });
+  }
+);
+
+module.exports = mongoose.model(
+  'Response',
+  responseSchema
+);

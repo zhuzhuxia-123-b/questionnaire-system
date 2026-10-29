@@ -1,0 +1,150 @@
+.resource-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.resource-home-link,
+.resource-link-button {
+  display: inline-block;
+  padding: 0.7rem 1rem;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #1f4f8a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.resource-page {
+  padding-bottom: 3rem;
+}
+
+.resource-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+#resource-data-summary {
+  margin-left: 0.75rem;
+  color: #5b6472;
+}
+
+.resource-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.resource-tabs button {
+  width: auto;
+  background: #e8edf5;
+  color: #24344d;
+}
+
+.resource-tabs button.is-active {
+  background: #245ea8;
+  color: #ffffff;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.resource-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.8rem 0;
+}
+
+.resource-actions button {
+  width: auto;
+}
+
+.resource-output {
+  min-height: 7rem;
+  max-height: 28rem;
+  overflow: auto;
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid #d8dee8;
+  border-radius: 0.5rem;
+  background: #f7f9fc;
+  color: #243044;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.resource-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.resource-list-item {
+  padding: 0.8rem;
+  border: 1px solid #d8dee8;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.resource-list-item p {
+  margin: 0.25rem 0;
+}
+
+.resource-list-item button {
+  width: auto;
+  margin-top: 0.5rem;
+}
+
+.resource-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.resource-summary-card {
+  padding: 0.8rem;
+  border-radius: 0.5rem;
+  background: #eef4fc;
+}
+
+.resource-summary-card strong,
+.resource-summary-card span {
+  display: block;
+}
+
+.resource-summary-card strong {
+  font-size: 1.35rem;
+  color: #174f91;
+}
+
+.button-danger {
+  background: #a93232;
+}
+
+hr {
+  margin: 1.2rem 0;
+  border: 0;
+  border-top: 1px solid #d8dee8;
+}
+
+@media (max-width: 800px) {
+  .resource-header,
+  .resource-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .resource-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -62,7 +62,26 @@ async function submitResponse(req, res, next) {
       });
     }
 
-    const responseData = {
+/*
+ * 只有问卷中的全部题目都采用第二阶段的
+ * 逻辑题目和版本引用时，才将新答卷标记为
+ * schemaVersion 2。
+ *
+ * 混合使用第一阶段普通题目和第二阶段复用题目
+ * 的问卷仍保持 schemaVersion 1，但复用题目的
+ * answer 快照仍会保存 questionItemId 和
+ * questionVersionId，供跨问卷统计使用。
+ */
+const usesOnlyVersionedQuestions =
+  questions.length > 0 &&
+  questions.every(
+    (question) =>
+      question.questionItemId &&
+      question.questionVersionId &&
+      question.schemaVersion >= 2
+  );
+
+const responseData = {
       surveyId: survey._id,
       respondentId: req.user.id,
       anonymous,
@@ -70,6 +89,8 @@ async function submitResponse(req, res, next) {
       visitedQuestionIds:
         submission.visitedQuestionIds,
       surveyVersion: survey.schemaVersion,
+      schemaVersion:
+        usesOnlyVersionedQuestions ? 2 : 1,
     };
 
     if (!survey.allowMultipleSubmissions) {

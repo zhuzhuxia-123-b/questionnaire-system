@@ -344,6 +344,10 @@ function buildSubmission(questions, inputAnswers) {
 
       answerSnapshots.push({
         questionId: currentQuestion._id,
+        questionItemId:
+          currentQuestion.questionItemId || null,
+        questionVersionId:
+          currentQuestion.questionVersionId || null,
         questionType: currentQuestion.type,
         questionTitle: currentQuestion.title,
         value: normalizedAnswer.value,
